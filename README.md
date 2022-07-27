@@ -18,7 +18,7 @@ To plot from the APC dataset, choose:
 
 The plot produced is similar to this
 
-![heatmap](https://github.com/rishavsen1/tranist_plot_app/blob/master/example/transit_app_3.png)
+![heatmap](https://github.com/rishavsen1/tranist_plot_app/blob/master/example/transit_app_2.png)
 
 Step 4<br>
 Click on the Route-wise statistics to know about other parameters. This page shows shows the Max Occupancy, Baordings, Delays, and Headway aggregated data.
