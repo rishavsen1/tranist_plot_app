@@ -7,8 +7,8 @@ import pandas as pd
 from src import plot_utils
 # import pickle5 as pickle
 
-st.markdown("# CARTA Max Occupancy")
-st.sidebar.markdown("# CARTA Max Occupancy")
+st.markdown("# Transit Heatmap")
+st.sidebar.markdown("# Transit heatmap")
 
 with st.sidebar:
     plot_demo_button = st.button('Plot example graph')

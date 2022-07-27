@@ -22,8 +22,8 @@ def func2(x):
     return None
 
 
-st.markdown("# Per Route Statistics")
-st.sidebar.markdown("# Per Route Statistics")
+st.markdown("# Route-wise Statistics")
+st.sidebar.markdown("# Per Route-wise Statistics")
 
 # Everytime you change something here, the entire site will refresh.
 with st.sidebar:
@@ -93,7 +93,7 @@ if plot_button:
         if i%6 == 0:
             int_arr.append(time_vals[i])
 
-    st.dataframe(df_route.sort_values('actual_hdwy', ascending=False))
+    # st.dataframe(df_route.sort_values('actual_hdwy', ascending=False))
 
     st.write(f"max occupancy in {agg_time} minute windows")
     df_b = df_route.dropna(subset=['load']).groupby(['time_grp', 'trip_id', 'direction']).max().reset_index()
