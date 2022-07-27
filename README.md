@@ -9,4 +9,4 @@ Run (main_page.py)[https://github.com/rishavsen1/tranist_plot_app/blob/master/ma
 This will generate a link to the streamlit app and open up in the browser.
 
 Step 3<br>
-Choose the aggregation time (in minutes) and the dates to filter by on the left side menu [!home_page](https://github.com/rishavsen1/tranist_plot_app/blob/master/example/transit_app_1.png)
+Choose the aggregation time (in minutes) and the dates to filter by on the left side menu ![home_page](https://github.com/rishavsen1/tranist_plot_app/blob/master/example/transit_app_1.png)
