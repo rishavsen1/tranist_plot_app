@@ -1,6 +1,6 @@
 **Plots for transit parameters**
 
-Step 1 <br>Open (apc_preprocess.py)[https://github.com/rishavsen1/tranist_plot_app/blob/master/apc_preprocess.py] and enter the path to APC parquet format data on line 83. Run the file. This will genereate the preprocessed APC files as a parquet.
+Step 1 <br>Open [apc_preprocess.py](https://github.com/rishavsen1/tranist_plot_app/blob/master/apc_preprocess.py) and enter the path to APC parquet format data on line 83. Run the file. This will genereate the preprocessed APC files as a parquet.
 <br>
 
 Step 2<br>
