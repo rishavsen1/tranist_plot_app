@@ -20,7 +20,7 @@ import time
 import math
 from copy import deepcopy
 
-from transit_plot-app.src import config
+from transit_plot_app.src import config
 
 pd.set_option('display.max_columns', None)
 import pyspark
@@ -125,4 +125,4 @@ apcdata = apcdata.withColumn('is_target', F.when(((F.col('actual_hdwy') / F.col(
 # apcdata.select('transit_date','year','month','hour','dayofweek',"route_id",'trip_id','stop_id','block_number','route_direction_name','dwell_time','load','offs','ons','time_actual_arrive','time_actual_depart','delay','time_scheduled','vehicle_id','stop_name','actual_hdwy','prev_sched').filter()
 # os.getcwd()
 
-apcdata.write.partitionBy("year", 'month').mode("overwrite").parquet('./transit_plot_app/data/{0}'.format(CARTA_PARQUET)
+apcdata.write.partitionBy("year", 'month').mode("overwrite").parquet('./transit_plot_app/data/{0}'.format(config.CARTA_PARQUET)
