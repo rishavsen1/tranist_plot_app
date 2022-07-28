@@ -20,8 +20,7 @@ import time
 import math
 from copy import deepcopy
 
-from src import tf_utils, data_utils
-from src.config import *
+from src import config
 
 pd.set_option('display.max_columns', None)
 import pyspark
@@ -80,7 +79,7 @@ def seconds_to_timestr(seconds, format='%H:%M:%S'):
 # load the APC data
 
 '''Enter path name to APC data'''
-filepath = os.path.join(os.getcwd(), 'rishav_app', "data", "carta-apc.parquet")
+filepath = os.path.join(os.getcwd(), 'rishav_app', "data", config.CARTA_PARQUET_PREPROCESS)
 apcdata = spark.read.load(filepath)
 
 # add day and hour of day

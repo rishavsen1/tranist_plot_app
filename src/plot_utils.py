@@ -19,7 +19,7 @@ def discrete_colorscale(bvals, colors):
         dcolorscale.extend([[nvals[k], colors[k]], [nvals[k+1], colors[k]]])
     return dcolorscale
 
-def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity):
+def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity, dataset_selectbox):
     all_route_id_dirs = vis_df.route_id_dir.unique()
     
     TIME_GRANULARITY = time_granularity #minutes
@@ -34,11 +34,17 @@ def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity):
         if _df.empty:
             continue
         
-        _df['time_window'] = _df.apply(lambda x: data_utils.get_time_window(x, TIME_GRANULARITY), axis=1)
-        _df = _df.groupby('time_window').max()
-        
-        indices = _df.index.astype('int')
-        _df['y_classes'] = _df['load'].apply(lambda x: data_utils.get_class(x))
+        if dataset_selectbox == 'Nashville, MTA':
+            _df['time_window'] = _df.apply(lambda x: data_utils.get_time_window(x, TIME_GRANULARITY, row_name='arrival_time'), axis=1)
+            _df = _df.groupby('time_window').max()
+            indices = _df.index.astype('int')
+            _df['y_classes'] = _df['y_reg100'].apply(lambda x: data_utils.get_class(x, dataset_selectbox))
+        elif dataset_selectbox == 'Chattanooga, CARTA':
+            _df['time_window'] = _df.apply(lambda x: data_utils.get_time_window(x, TIME_GRANULARITY, row_name='time_actual_arrive'), axis=1)
+            _df = _df.groupby('time_window').max()
+            indices = _df.index.astype('int')
+            _df['y_classes'] = _df['load'].apply(lambda x: data_utils.get_class(x, dataset_selectbox))
+            
         y_classes = _df['y_classes'].to_numpy()
         zero_arr[i, indices] = y_classes
         trip_id_arr[i, indices] = _df.trip_id.to_numpy(dtype=int)

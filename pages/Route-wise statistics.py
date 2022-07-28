@@ -1,163 +1,258 @@
-from time import strftime
 import streamlit as st
 import plotly.express as px
 import datetime as dt
 import pandas as pd
-import numpy as np
+import os
+from pyspark.sql import SparkSession
+from pyspark.sql.types import IntegerType
+import pyspark.sql.functions as F
+from src import config
 
-from datetime import datetime, timedelta
-
-def datetime_range(start, end, delta):
-    current = start
-    while current < end:
-        yield current
-        current += delta
-
-def func2(x):
-    for i in range(len(time_arr)):
-        try:
-            if x<=time_arr[i]:
-                return int(i)
-        except:pass
-    return None
-
+spark = SparkSession.builder.config('spark.executor.cores', '8').config('spark.executor.memory', '40g')\
+        .config("spark.sql.session.timeZone", "UTC").config('spark.driver.memory', '20g').master("local[26]")\
+        .appName("wego-daily").config('spark.driver.extraJavaOptions', '-Duser.timezone=UTC').config('spark.executor.extraJavaOptions', '-Duser.timezone=UTC')\
+        .config("spark.sql.datetime.java8API.enabled", "true").config("spark.sql.execution.arrow.pyspark.enabled", "true")\
+        .getOrCreate()
 
 st.markdown("# Route-wise Statistics")
 st.sidebar.markdown("# Per Route-wise Statistics")
 
 # Everytime you change something here, the entire site will refresh.
 with st.sidebar:
-    route_option = st.selectbox('Route:', ['1', '2A', '3', '4', '5A', '7', '8', '9', '10A', '10C', '10G', '13', '14', '15A', '16', '21', '28', '33', '34', 'DTS'])
+    use_case_selectbox = st.selectbox('Use case', ('Historical', 'Prediction'))
+    dataset_selectbox = st.selectbox('Dataset', ('Chattanooga, CARTA', 'Nashville, MTA'))
+    if dataset_selectbox == 'Chattanooga, CARTA':
+        fp = os.path.join('data', 'CARTA_route_ids.csv')
+        filter_date = st.date_input('Filter dates', min_value=dt.date(2019, 1, 1), max_value=dt.date(2022, 5, 30),
+                                    value=(dt.date(2021, 10, 18), dt.date(2021, 10, 19)))
+    elif dataset_selectbox == 'Nashville, MTA':
+        fp = os.path.join('data', 'MTA_route_ids.csv')
+        filter_date = st.date_input('Filter dates', min_value=dt.date(2020, 1, 1), max_value=dt.date(2022, 4, 6),
+                                    value=(dt.date(2021, 10, 18), dt.date(2021, 10, 19)))
+    
+    route_list = pd.read_csv(fp).dropna().sort_values('route_id').route_id.tolist()
+    route_option = st.selectbox('Route:', route_list)
+    
     agg_time = st.number_input('Aggregation window (mins):', value=15)
-    filter_date = st.date_input('Filter dates', value=(dt.date(2022, 1, 6), dt.date(2022, 2, 15)))
-    # percentile_option = st.selectbox('Percentile:', (75, 90, 100))
+    window = agg_time
+
+    points = st.selectbox('Show box plot points:', ('all', 'outliers', 'suspectedoutliers', False))
     plot_button = st.button('Plot graphs')
     
 if plot_button:
-    time_arr = [dt.time() for dt in 
-       datetime_range(datetime(2016, 9, 1, 0), datetime(2016, 9, 2, 1), 
-       timedelta(minutes=agg_time))][1:-3]
+    if dataset_selectbox == 'Nashville, MTA':
+        filepath = os.path.join(os.getcwd(), "data", config.MTA_PARQUET)
+    elif dataset_selectbox == 'Chattanooga, CARTA':
+        filepath = os.path.join(os.getcwd(), "data", config.CARTA_PARQUET)
+    else:
+        st.error("Select dataset")
 
-    years = [year for year in range(filter_date[0].year, filter_date[1].year+1)]
-    apc_df = pd.DataFrame()
-    if len(years)==1:
-        months = [i for i in range(filter_date[0].month, (filter_date[1].month)+1)]
-        for month in months:
-            apc_df = apc_df.append(pd.read_parquet('./data/carta_apc_out.parquet/year={}/month={}/'.format(years[0], month), engine='pyarrow'))
-    elif len(years)==2:
-        months = [i for i in range(filter_date[0].month, 13)]
-        for month in months:
-            apc_df = apc_df.append(pd.read_parquet('./data/carta_apc_out.parquet/year={}/month={}/'.format(years[0], month), engine='pyarrow'))
-
-        months = [i for i in range(1, filter_date[1].month+1)]
-        for month in months:
-            apc_df = apc_df.append(pd.read_parquet('./data/carta_apc_out.parquet/year={}/month={}/'.format(years[1], month), engine='pyarrow'))
+    start = filter_date[0].strftime('%Y-%m-%d')
+    end   = filter_date[1].strftime('%Y-%m-%d')
     
-    elif len(years)>2:
-        months = [i for i in range(filter_date[0].month, 13)]
-        for month in months:
-            apc_df = apc_df.append(pd.read_parquet('./data/carta_apc_out.parquet/year={}/month={}/'.format(years[0], month), engine='pyarrow'))
-
-        apc_df.append(pd.read_parquet('./data/carta_apc_out.parquet/year={}/'.format(years[1:-1]), engine='pyarrow'))
-
-        months = [i for i in range(1, filter_date[1].month+1)]
-        for month in months:
-            apc_df = apc_df.append(pd.read_parquet('./data/carta_apc_out.parquet/year={}/month={}/'.format(years[1], month), engine='pyarrow'))
-
-    apc_df = apc_df.reset_index(drop=True)
-    apc_df.transit_date = pd.to_datetime(apc_df.transit_date)
+    time_range = pd.date_range(pd.Timestamp('2020-01-01'), pd.Timestamp('2020-01-02'), freq=f'{agg_time}min').time
     
-    if (apc_df.iloc[0].transit_date >= filter_date[1]) or (apc_df.iloc[-1].transit_date <= filter_date[0]):
-        st.write('Date ranges out of data')
-        exit()
-    apc_df = apc_df[(apc_df['transit_date']>=pd.Timestamp(filter_date[0])) & (apc_df['transit_date']<=pd.Timestamp(filter_date[1]))]
-    apc_df.time_actual_arrive = apc_df.time_actual_arrive.astype(str)
-    apc_df.time_actual_arrive = pd.to_datetime(apc_df['time_actual_arrive'])
+    with st.spinner(f"Loading {dataset_selectbox} files..."):
+        st.write(f"Plots of {dataset_selectbox} using {agg_time} minute time windows.")
 
-    df_route = apc_df[apc_df.route_id == route_option].reset_index(drop=True)
+        if dataset_selectbox == 'Nashville, MTA':
+            st.write(filepath)
+            apcdata = spark.read.load(filepath)
+            apcdata.createOrReplaceTempView("apc")
 
-    df_route['time_only'] = pd.to_datetime(df_route['time_actual_arrive'],format= '%H:%M:%S' ).dt.time
+            # filter subset
+            query = """
+                    SELECT transit_date, trip_id, 
+                           first(arrival_time) as arrival_time,
+                           first(route_id) AS route_id, 
+                           first(hour) as hour,
+                           first(route_direction_name) AS route_direction_name, 
+                           percentile(INT(delay_time), 0.95) AS delay,
+                           percentile(INT(actual_hdwy), 0.95) AS headway,
+                           percentile(INT(load), 1.00) AS y_reg100,
+                           percentile(INT(ons), 1.00) AS boardings
+                    FROM apc
+                    GROUP BY transit_date, trip_id
+                    ORDER BY arrival_time
+                    """
+            apcdata_per_trip=spark.sql(query)
+            apcdata_per_trip = apcdata_per_trip.where(apcdata_per_trip.route_id == route_option)
+            apcdata_per_trip = apcdata_per_trip.filter(F.col("transit_date").between(filter_date[0], filter_date[1]))
+            apcdata_per_trip = apcdata_per_trip.withColumn("minute", F.minute("arrival_time"))
+            apcdata_per_trip = apcdata_per_trip.withColumn("minuteByWindow", apcdata_per_trip.minute/window)
+            apcdata_per_trip = apcdata_per_trip.withColumn("time_window", apcdata_per_trip.minuteByWindow + (apcdata_per_trip.hour * (60 / window)))
+            apcdata_per_trip = apcdata_per_trip.withColumn("time_window", F.floor(apcdata_per_trip.time_window).cast(IntegerType()))
+            apcdata_per_trip = apcdata_per_trip.filter(apcdata_per_trip.y_reg100 <= 100.0)
+            
+            df = apcdata_per_trip.toPandas()
+            df = df.rename({'route_direction_name':'direction'}, axis=1)
+            df = df.rename({'y_reg100':'load'}, axis=1)
+            df = df.dropna()
 
-    df_route['time_grp'] = df_route.time_only.apply(lambda x: func2(x))
+        elif dataset_selectbox == 'Chattanooga, CARTA':
+            st.write(filepath)
+            apcdata = spark.read.load(filepath)
+            apcdata.createOrReplaceTempView("apc")
 
-    df_route.rename(columns={'route_direction_name':'direction'}, inplace=True)
-    df_route.rename(columns={'ons':'boardings'}, inplace=True)
-
-    # Showing the dataframe for easy reference for you
-    df_route['time_axis'] = df_route.time_grp.dropna().apply(lambda x: (time_arr[int(x)]) ) 
-
-    time_vals = df_route.sort_values('time_grp').time_grp.dropna().unique()
-
-    int_arr=[]
-    for i in range(len(time_vals)):
-        if i%6 == 0:
-            int_arr.append(time_vals[i])
-
-    # st.dataframe(df_route.sort_values('actual_hdwy', ascending=False))
-
-    st.write(f"max occupancy in {agg_time} minute windows")
-    df_b = df_route.dropna(subset=['load']).groupby(['time_grp', 'trip_id', 'direction']).max().reset_index()
-    fig = px.box(df_b, x="time_grp", y="load", facet_row="direction", color='direction', width=1000)
-    fig.update_layout(
-    xaxis = dict(
-        tickmode = 'array',
-        tickvals = int_arr,
-        ticktext = [time_arr[int(i)] for i in int_arr]
+            # filter subset
+            query = """
+                    SELECT transit_date, trip_id, 
+                           first(time_actual_arrive) as time_actual_arrive,
+                           first(route_id) AS route_id, 
+                           first(hour) as hour,
+                           first(route_direction_name) AS direction, 
+                           percentile(INT(delay), 0.95) AS delay,
+                           percentile(INT(actual_hdwy), 0.95) AS headway,
+                           percentile(INT(load), 1.00) AS load,
+                           percentile(INT(ons), 1.00) AS boardings
+                    FROM apc
+                    GROUP BY transit_date, trip_id
+                    ORDER BY time_actual_arrive
+                    """
+            apcdata=spark.sql(query)
+            apcdata = apcdata.where(apcdata.route_id == route_option)
+            apcdata = apcdata.filter(F.col("transit_date").between(filter_date[0], filter_date[1]))
+            apcdata = apcdata.na.drop(subset=["time_actual_arrive"])
+            apcdata = apcdata.withColumnRenamed("route_direction_name", "direction")
+            apcdata = apcdata.withColumnRenamed("ons", "boardings")
+            apcdata = apcdata.withColumn("minute", F.minute("time_actual_arrive"))
+            apcdata = apcdata.withColumn("minuteByWindow", apcdata.minute/window)
+            apcdata = apcdata.withColumn("time_window", apcdata.minuteByWindow + (apcdata.hour * (60 / window)))
+            apcdata = apcdata.withColumn("time_window", F.floor(apcdata.time_window).cast(IntegerType()))
+            
+            df = apcdata.toPandas()
+        
+        # Common code
+        df['time_window'] = df['time_window'].astype('int')
+        df['time_window_str'] = df['time_window'].apply(lambda x: time_range[x])
+        
+        st.dataframe(df.head())
+        st.dataframe(df.tail())
+        if df.empty:
+            st.error("Dataframe is empty.")
+            
+        # 1. Loads box plot
+        st.write(f"max occupancy in {agg_time} minute windows")
+        fig = px.box(df, x="time_window_str", y="load", facet_row="direction", color="direction",
+                    boxmode="overlay", points=points)
+        fig.update_xaxes(tickformat="%H:%M")
+        layout = fig.update_layout(
+            title='Max Occupancy',
+            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+            width=1000, height=500,
         )
-    )
-    st.plotly_chart(fig)
-
-    st.write(f"boarding events in {agg_time} minute windows (scatter plot)")
-    fig1 = px.scatter(df_route.sort_values('time_grp'), x="time_grp", y="boardings", facet_row="direction", color='direction', width=1000)
-    fig1.update_layout(
-    xaxis = dict(
-        tickmode = 'array',
-        tickvals = int_arr,
-        ticktext = [time_arr[int(i)] for i in int_arr]
+        for a in fig.layout.annotations:
+            a.text = a.text.split("=")[1]
+        st.plotly_chart(fig)
+        
+        # 2. Boardings box plot
+        st.write(f"boarding events in {agg_time} minute windows (scatter plot)")
+        fig = px.box(df, x="time_window_str", y="boardings", facet_row="direction", color="direction",
+                        boxmode="overlay", points=points)
+        fig.update_xaxes(tickformat="%H:%M")
+        layout = fig.update_layout(
+            title='Boardings',
+            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+            width=1000, height=500,
         )
-    )
-    st.plotly_chart(fig1)
-
-    st.write(f"headway (average gap between trips) in {agg_time} minute windows")
-    fig1 = px.box(df_route.rename({'actual_hdwy':'headway'}, axis=1).sort_values('time_grp'), x="time_grp", y="headway", facet_row="direction", color='direction', width=1000, 
-    labels={
-                     "time_grp": "Aggregation interval (hh:mm:ss)",
-                     "headway": "Headway (in seconds)",
-                 }
-                 )
-    fig1.update_layout(
-    xaxis = dict(
-        tickmode = 'array',
-        tickvals = int_arr,
-        ticktext = [time_arr[int(i)] for i in int_arr]
+        for a in fig.layout.annotations:
+            a.text = a.text.split("=")[1]
+        st.plotly_chart(fig)
+        
+        # 3. Actual headways (limit to less than 5 hours)
+        st.write(f"headway (average gap between trips) in {agg_time} minute windows")
+        fig = px.box(df[df['headway'] <= 3 * 3600], x="time_window_str", y="headway", facet_row="direction", color='direction',
+                        boxmode="overlay", points=points)
+        fig.update_xaxes(tickformat="%H:%M")
+        # fig.update_xaxes(tickformat="%H:%M", dtick=agg_time * 60 * 5)
+        fig.update_yaxes(title='Headway (s)')
+        layout = fig.update_layout(
+            title='Actual headways',
+            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+            width=1000, height=500,
+            yaxis_range=[-400, 10000]
         )
-    )
-    st.plotly_chart(fig1)
-
-    st.write(f"delays (scheduled vs actual time at the arrival at a stop) in {agg_time} minute windows")
-    fig1 = px.box(df_route[(df_route.delay > -300) & (df_route.delay < 80000)].sort_values('time_grp'), x="time_grp", y="delay", facet_row="direction", color='direction', width=1000, 
-    labels={
-                     "time_grp": "Aggregation interval (hh:mm:ss)",
-                     "delay": "Delay (in seconds)",
-                 }
-                 )
-    fig1.update_layout(
-    xaxis = dict(
-        tickmode = 'array',
-        tickvals = int_arr,
-        ticktext = [time_arr[int(i)] for i in int_arr]
+        for a in fig.layout.annotations:
+            a.text = a.text.split("=")[1]
+        st.plotly_chart(fig)
+        
+        # 4. Delays
+        st.write(f"delays (scheduled vs actual time at the arrival at a stop) in {agg_time} minute windows")
+        fig = px.box(df[(df.delay > -300) & (df.delay < 3 * 3600)], x="time_window_str", y="delay", facet_row="direction", color='direction',
+                        boxmode="overlay", points=points)
+        fig.update_xaxes(tickformat="%H:%M")
+        fig.update_yaxes(title='Delay (s)')
+        layout = fig.update_layout(
+            title='Delays',
+            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+            width=1000, height=500,
+            yaxis_range=[-400, 10000]
         )
-    )
-    st.plotly_chart(fig1)
+        for a in fig.layout.annotations:
+            a.text = a.text.split("=")[1]
+        st.plotly_chart(fig)
 
-    st.write(f"boarding per stop per day in {agg_time} minute windows")
-    df_stop = df_route.groupby(['stop_name', 'time_grp']).sum().reset_index()[['time_grp', 'stop_name', 'boardings']].dropna()
-    fig1 = px.box(df_stop, x="stop_name", y="boardings", width=1000)
-    fig1.update_layout(
-    xaxis = dict(
-        tickmode = 'array',
-        tickvals = int_arr,
-        ticktext = [time_arr[int(i)] for i in int_arr]
+        # 5. 95th percentile of boardings in a stop
+        if dataset_selectbox == 'Nashville, MTA':
+            apcdata = spark.read.load(filepath)
+            apcdata.createOrReplaceTempView("apc")
+            # filter subset
+            query = f"""
+                    SELECT ons, hour, arrival_time, stop_name, stop_sequence, transit_date, route_id, route_direction_name
+                    FROM apc
+                    WHERE (transit_date >= '{start}') AND (transit_date <= '{end}' AND route_id == '{route_option}')
+                    """
+            apcdata=spark.sql(query)
+            
+            window = agg_time # minutes
+            apcdata = apcdata.withColumn("minute", F.minute("arrival_time"))
+            apcdata = apcdata.withColumn("minuteByWindow", apcdata.minute/window)
+            apcdata = apcdata.withColumn("time_window", apcdata.minuteByWindow + (apcdata.hour * (60 / window)))
+            apcdata = apcdata.withColumn("time_window", F.floor(apcdata.time_window).cast(IntegerType()))
+            apcdata = apcdata.drop("minuteByWindow", "minute", "hour")
+            apcdata = apcdata.na.drop(subset=["time_window"])
+            df = apcdata.toPandas()
+            df['time_window'] = df['time_window'].astype('int')
+            df['time_window_str'] = df['time_window'].apply(lambda x: time_range[x])
+            df = df.rename({'route_direction_name':'direction'}, axis=1)
+            df_stop = df.groupby(['stop_sequence', 'time_window_str']).agg({'ons':'sum', 'direction':'first'}).reset_index()[['stop_sequence', 'time_window_str', 'ons', 'direction']].dropna()
+            df_stop = df_stop[df_stop['stop_sequence'] > 1]
+            
+        elif dataset_selectbox == 'Chattanooga, CARTA':
+            apcdata = spark.read.load(filepath)
+            apcdata.createOrReplaceTempView("apc")
+            # filter subset
+            query = f"""
+                    SELECT ons, hour, time_actual_arrive, stop_name, transit_date, route_id, route_direction_name
+                    FROM apc
+                    WHERE (transit_date >= '{start}') AND (transit_date <= '{end}' AND route_id == '{route_option}')
+                    ORDER BY time_actual_arrive
+                    """
+            apcdata=spark.sql(query)
+            
+            window = agg_time # minutes
+            apcdata = apcdata.withColumn("minute", F.minute("time_actual_arrive"))
+            apcdata = apcdata.withColumn("minuteByWindow", apcdata.minute/window)
+            apcdata = apcdata.withColumn("time_window", apcdata.minuteByWindow + (apcdata.hour * (60 / window)))
+            apcdata = apcdata.withColumn("time_window", F.floor(apcdata.time_window).cast(IntegerType()))
+            apcdata = apcdata.drop("minuteByWindow", "minute", "hour")
+            apcdata = apcdata.na.drop(subset=["time_window"])
+            apcdata = apcdata.withColumnRenamed("route_direction_name", "direction")
+            df = apcdata.toPandas()
+            df['time_window'] = df['time_window'].astype('int')
+            df['time_window_str'] = df['time_window'].apply(lambda x: time_range[x])
+            df_stop = df.groupby(['stop_name', 'time_window_str']).agg({'ons':'sum', 'direction':'first'}).reset_index()[['stop_name', 'time_window_str', 'ons', 'direction']].dropna()
+
+        # Common code
+        st.write(f"boarding per stop per day in {agg_time} minute windows")
+        fig = px.box(df_stop, x="time_window_str", y="ons", facet_row='direction', color='direction', 
+                        boxmode="overlay", points=points, width=1000)
+        fig.update_xaxes(tickformat="%H:%M")
+        layout = fig.update_layout(
+            title='Boardings per stop per time window',
+            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+            width=1000, height=500,
         )
-    )
-    st.plotly_chart(fig1, use_container_width=False)
+        for a in fig.layout.annotations:
+            a.text = a.text.split("=")[1]
+        st.plotly_chart(fig)
