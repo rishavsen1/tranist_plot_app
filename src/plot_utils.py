@@ -102,6 +102,44 @@ def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity, dataset_s
         xaxis_tickformat='%H:%M',
         xaxis_hoverformat='%H:%M',
     )
+    return fig
 
-    # fig.write_html(f"plots/{TIME_GRANULARITY}min_window_{DATE_START}.html")
+def plot_prediction_heatmap(predict_date, prediction_df):
+    dates = pd.date_range(pd.Timestamp(predict_date), pd.Timestamp(predict_date) + pd.Timedelta('24h') - pd.Timedelta('30m'), freq='30min')
+    
+    hovertext = list()
+    for yi, yy in enumerate(prediction_df.index):
+        hovertext.append(list())
+        for xi, xx in enumerate(dates):
+            timestamp = xx.time()
+            data = prediction_df.to_numpy()[yi][xi]
+            if not np.isnan(data):
+                load = ticktext[int(data)]
+            else:
+                load = data
+            hovertext[-1].append('Time: {}<br />Route: {}<br />Load: {}'.format(timestamp, yy, load))
+
+    dcolorsc = discrete_colorscale(bvals, colors)            
+    fig = go.Figure(data=[go.Heatmap(z=prediction_df.to_numpy(), 
+                                xgap=0.5,
+                                ygap=0.5,
+                                y=prediction_df.index,
+                                x=dates,
+                                zmin=0, zmax=4, 
+                                colorscale = dcolorsc, 
+                                colorbar = dict(thickness=25, 
+                                                tickvals=tickvals, 
+                                                ticktext=ticktext),
+                                showscale=True,
+                                type = 'heatmap',
+                                hoverongaps=False,
+                                hoverinfo='text',
+                                text=hovertext)])
+    fig.update_layout(
+        title=f"Prediction for {predict_date} with 30 minute time windows.",
+        xaxis_title="Time",
+        yaxis_title="Route id and directions",
+        xaxis_tickformat='%H:%M',
+        xaxis_hoverformat='%H:%M'
+    )
     return fig

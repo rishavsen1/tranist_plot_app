@@ -2,5 +2,3 @@
 *
 # Except this file
 !.gitignore
-!*_route_ids.csv
-!mta_day_ahead

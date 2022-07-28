@@ -92,9 +92,7 @@ def get_apc_per_trip_sparkview(spark, query=None, window=30):
             mean(FLOAT(darksky_precipitation_intensity)) as precipitation_intensity,
             mean(FLOAT(sched_hdwy)) AS scheduled_headway,
             mean(FLOAT(actual_hdwy)) AS actual_headways,
-            percentile(INT(load), 1.00) AS y_reg100,
-            percentile(INT(load), 0.95) AS y_reg095,
-            collect_list(load) AS load
+            percentile(INT(load), 1.00) AS load
         FROM apcdata
         GROUP BY transit_date, trip_id
         ORDER BY arrival_time
@@ -111,7 +109,7 @@ def get_apc_per_trip_sparkview(spark, query=None, window=30):
     apcdata_per_trip = apcdata_per_trip.withColumn("minuteByWindow", apcdata_per_trip.minute/window)
     apcdata_per_trip = apcdata_per_trip.withColumn("time_window", apcdata_per_trip.minuteByWindow + (apcdata_per_trip.hour * (60 / window)))
     apcdata_per_trip = apcdata_per_trip.withColumn("time_window", F.floor(apcdata_per_trip.time_window).cast(IntegerType()))
-    apcdata_per_trip = apcdata_per_trip.filter(apcdata_per_trip.y_reg100 <= 100.0)
+    apcdata_per_trip = apcdata_per_trip.filter(apcdata_per_trip.load <= 100.0)
 
     # Deleting nulls
     todelete = apcdata_per_trip.filter('temperature="NULL" or temperature is null').select('transit_date','trip_id').distinct()

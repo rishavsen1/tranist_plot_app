@@ -60,8 +60,6 @@ if plot_button:
             apcdata.createOrReplaceTempView('apcdata')
             apcdata_per_trip = data_utils.get_apc_per_trip_sparkview(spark)
             apcdata_per_trip = apcdata_per_trip.withColumnRenamed("route_id_direction","route_id_dir")
-            apcdata_per_trip = apcdata_per_trip.drop("load")
-            apcdata_per_trip = apcdata_per_trip.withColumnRenamed("y_reg100","load")
             df = apcdata_per_trip.toPandas()
         elif dataset_selectbox == 'Chattanooga, CARTA':
             apcdata_per_trip=spark.sql(query)

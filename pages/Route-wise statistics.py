@@ -35,7 +35,7 @@ with st.sidebar:
     agg_time = st.number_input('Aggregation window (mins):', value=15)
     window = agg_time
 
-    points = st.selectbox('Show box plot points:', ('all', 'outliers', 'suspectedoutliers', False))
+    points = st.selectbox('Show box plot points:', (False, 'all', 'outliers', 'suspectedoutliers'))
     plot_button = st.button('Plot graphs')
     
 if plot_button:
