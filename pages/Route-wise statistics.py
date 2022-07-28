@@ -17,6 +17,8 @@ spark = SparkSession.builder.config('spark.executor.cores', '8').config('spark.e
 st.markdown("# Route-wise Statistics")
 st.sidebar.markdown("# Per Route-wise Statistics")
 
+tab_occupancy, tab_boarding, tab_headway, tab_delay, tab_stops = st.tabs(['Occupancy', 'Boardings', 'Headways', 'Delays', 'Stops'])
+
 # Everytime you change something here, the entire site will refresh.
 with st.sidebar:
     dataset_selectbox = st.selectbox('Dataset', ('Chattanooga, CARTA', 'Nashville, MTA'))
@@ -131,65 +133,66 @@ if plot_button:
             st.error("Dataframe is empty.")
             
         # 1. Loads box plot
-        st.write(f"max occupancy in {agg_time} minute windows")
-        fig = px.box(df, x="time_window_str", y="load", facet_row="direction", color="direction",
-                    boxmode="overlay", points=points)
-        fig.update_xaxes(tickformat="%H:%M")
-        layout = fig.update_layout(
-            title='Max Occupancy',
-            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
-            width=1000, height=500,
-        )
-        for a in fig.layout.annotations:
-            a.text = a.text.split("=")[1]
-        st.plotly_chart(fig)
+        with tab_occupancy:
+            st.write(f"max occupancy in {agg_time} minute windows")
+            fig = px.box(df, x="time_window_str", y="load", facet_row="direction", color="direction",
+                        boxmode="overlay", points=points)
+            fig.update_xaxes(tickformat="%H:%M")
+            layout = fig.update_layout(
+                title='Max Occupancy',
+                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M")
+            )
+            for a in fig.layout.annotations:
+                a.text = a.text.split("=")[1]
+            st.plotly_chart(fig)
         
         # 2. Boardings box plot
-        st.write(f"boarding events in {agg_time} minute windows (scatter plot)")
-        fig = px.box(df, x="time_window_str", y="boardings", facet_row="direction", color="direction",
-                        boxmode="overlay", points=points)
-        fig.update_xaxes(tickformat="%H:%M")
-        layout = fig.update_layout(
-            title='Boardings',
-            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
-            width=1000, height=500,
-        )
-        for a in fig.layout.annotations:
-            a.text = a.text.split("=")[1]
-        st.plotly_chart(fig)
+        with tab_boarding:
+            st.write(f"boarding events in {agg_time} minute windows (scatter plot)")
+            fig = px.box(df, x="time_window_str", y="boardings", facet_row="direction", color="direction",
+                            boxmode="overlay", points=points)
+            fig.update_xaxes(tickformat="%H:%M")
+            layout = fig.update_layout(
+                title='Boardings',
+                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M")
+            )
+            for a in fig.layout.annotations:
+                a.text = a.text.split("=")[1]
+            st.plotly_chart(fig)
         
         # 3. Actual headways (limit to less than 5 hours)
-        st.write(f"headway (average gap between trips) in {agg_time} minute windows")
-        fig = px.box(df[df['headway'] <= 3 * 3600], x="time_window_str", y="headway", facet_row="direction", color='direction',
-                        boxmode="overlay", points=points)
-        fig.update_xaxes(tickformat="%H:%M")
-        # fig.update_xaxes(tickformat="%H:%M", dtick=agg_time * 60 * 5)
-        fig.update_yaxes(title='Headway (s)')
-        layout = fig.update_layout(
-            title='Actual headways',
-            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
-            width=1000, height=500,
-            yaxis_range=[-400, 10000]
-        )
-        for a in fig.layout.annotations:
-            a.text = a.text.split("=")[1]
-        st.plotly_chart(fig)
+        with tab_headway:
+            st.write(f"headway (average gap between trips) in {agg_time} minute windows")
+            fig = px.box(df[df['headway'] <= 3 * 3600], x="time_window_str", y="headway", facet_row="direction", color='direction',
+                            boxmode="overlay", points=points)
+            fig.update_xaxes(tickformat="%H:%M")
+            # fig.update_xaxes(tickformat="%H:%M", dtick=agg_time * 60 * 5)
+            fig.update_yaxes(title='Headway (s)')
+            layout = fig.update_layout(
+                title='Actual headways',
+                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+                # width=1000, height=500,
+                yaxis_range=[-400, 10000]
+            )
+            for a in fig.layout.annotations:
+                a.text = a.text.split("=")[1]
+            st.plotly_chart(fig)
         
         # 4. Delays
-        st.write(f"delays (scheduled vs actual time at the arrival at a stop) in {agg_time} minute windows")
-        fig = px.box(df[(df.delay > -300) & (df.delay < 3 * 3600)], x="time_window_str", y="delay", facet_row="direction", color='direction',
-                        boxmode="overlay", points=points)
-        fig.update_xaxes(tickformat="%H:%M")
-        fig.update_yaxes(title='Delay (s)')
-        layout = fig.update_layout(
-            title='Delays',
-            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
-            width=1000, height=500,
-            yaxis_range=[-400, 10000]
-        )
-        for a in fig.layout.annotations:
-            a.text = a.text.split("=")[1]
-        st.plotly_chart(fig)
+        with tab_delay:
+            st.write(f"delays (scheduled vs actual time at the arrival at a stop) in {agg_time} minute windows")
+            fig = px.box(df[(df.delay > -300) & (df.delay < 3 * 3600)], x="time_window_str", y="delay", facet_row="direction", color='direction',
+                            boxmode="overlay", points=points)
+            fig.update_xaxes(tickformat="%H:%M")
+            fig.update_yaxes(title='Delay (s)')
+            layout = fig.update_layout(
+                title='Delays',
+                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
+                yaxis_range=[-400, 10000]
+            )
+            for a in fig.layout.annotations:
+                a.text = a.text.split("=")[1]
+            st.plotly_chart(fig)
 
         # 5. 95th percentile of boardings in a stop
         if dataset_selectbox == 'Nashville, MTA':
@@ -243,15 +246,15 @@ if plot_button:
             df_stop = df.groupby(['stop_name', 'time_window_str']).agg({'ons':'sum', 'direction':'first'}).reset_index()[['stop_name', 'time_window_str', 'ons', 'direction']].dropna()
 
         # Common code
-        st.write(f"boarding per stop per day in {agg_time} minute windows")
-        fig = px.box(df_stop, x="time_window_str", y="ons", facet_row='direction', color='direction', 
-                        boxmode="overlay", points=points, width=1000)
-        fig.update_xaxes(tickformat="%H:%M")
-        layout = fig.update_layout(
-            title='Boardings per stop per time window',
-            xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
-            width=1000, height=500,
-        )
-        for a in fig.layout.annotations:
-            a.text = a.text.split("=")[1]
-        st.plotly_chart(fig)
+        with tab_stops:
+            st.write(f"boarding per stop per day in {agg_time} minute windows")
+            fig = px.box(df_stop, x="time_window_str", y="ons", facet_row='direction', color='direction', 
+                            boxmode="overlay", points=points)
+            fig.update_xaxes(tickformat="%H:%M")
+            layout = fig.update_layout(
+                title='Boardings per stop per time window',
+                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M")
+            )
+            for a in fig.layout.annotations:
+                a.text = a.text.split("=")[1]
+            st.plotly_chart(fig)

@@ -41,10 +41,12 @@ with st.sidebar:
         
     random_df = st.radio(
         "Data generation:",
-        ('from past', 'random'))
+        ('from past', 'random'),
+        horizontal=True)
     routes = st.radio(
         "Routes:",
-        ('only active routes', 'all routes'))
+        ('only active routes', 'all routes'),
+        horizontal=True)
     
     predict_button = st.button('Plot predictions')
 
