@@ -1,5 +1,5 @@
 import os
-os.chdir("..")
+# os.chdir("..")
 print(os.getcwd())
 import sys
 import pandas as pd
@@ -17,16 +17,16 @@ from pyspark.sql import DataFrame
 from scipy.stats import zscore
 from pyspark.sql.types import IntegerType, StringType, FloatType
 import numpy as np
-import gtfs_kit as gk
+# import gtfs_kit as gk
 import time
 import math
-from src import config
+from transit_plot_app.src import config
 
 pd.set_option('display.max_columns', None)
 import pyspark
 print(pyspark.__version__)
-spark = SparkSession.builder.config('spark.executor.cores', '8').config('spark.executor.memory', '40g')\
-        .config("spark.sql.session.timeZone", "UTC").config('spark.driver.memory', '20g').master("local[26]")\
+spark = SparkSession.builder.config('spark.executor.cores', '8').config('spark.executor.memory', '80g')\
+        .config("spark.sql.session.timeZone", "UTC").config('spark.driver.memory', '40g').master("local[26]")\
         .appName("wego-daily").config('spark.driver.extraJavaOptions', '-Duser.timezone=UTC').config('spark.executor.extraJavaOptions', '-Duser.timezone=UTC')\
         .config("spark.sql.datetime.java8API.enabled", "true").config("spark.sql.execution.arrow.pyspark.enabled", "true")\
         .getOrCreate()
@@ -63,7 +63,7 @@ def get_days_of_week(week_arr):
 def seconds_to_timestr(seconds, format='%H:%M:%S'):
     return time.strftime(format, time.gmtime(seconds))
 
-filepath = os.path.join(os.getcwd(), "data", config.MTA_PARQUET_PREPROCESS)
+filepath = os.path.join(os.getcwd(), "data", 'cleaned-wego-daily.apc.parquet')
 apcdata = spark.read.load(filepath)
 
 # add day and hour of day
