@@ -3,6 +3,11 @@ from src import data_utils
 import numpy as np
 import plotly.graph_objects as go
 
+bvals = [0, 1, 2, 3, 4, 5]
+colors = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
+tickvals = [0, 1, 2, 3, 4, 5]
+ticktext = ['low', 'med', 'med-high', 'high', 'very-high']
+
 def discrete_colorscale(bvals, colors):
     """
     bvals - list of values bounding intervals/ranges of interest
@@ -33,17 +38,11 @@ def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity, dataset_s
         _df = vis_df[vis_df['route_id_dir'] == route_id_dir]
         if _df.empty:
             continue
-        
-        if dataset_selectbox == 'Nashville, MTA':
-            _df['time_window'] = _df.apply(lambda x: data_utils.get_time_window(x, TIME_GRANULARITY, row_name='arrival_time'), axis=1)
-            _df = _df.groupby('time_window').max()
-            indices = _df.index.astype('int')
-            _df['y_classes'] = _df['y_reg100'].apply(lambda x: data_utils.get_class(x, dataset_selectbox))
-        elif dataset_selectbox == 'Chattanooga, CARTA':
-            _df['time_window'] = _df.apply(lambda x: data_utils.get_time_window(x, TIME_GRANULARITY, row_name='time_actual_arrive'), axis=1)
-            _df = _df.groupby('time_window').max()
-            indices = _df.index.astype('int')
-            _df['y_classes'] = _df['load'].apply(lambda x: data_utils.get_class(x, dataset_selectbox))
+    
+        _df['time_window'] = _df.apply(lambda x: data_utils.get_time_window(x, TIME_GRANULARITY, row_name='arrival_time'), axis=1)
+        _df = _df[['time_window', 'load', 'trip_id']].groupby('time_window').agg({'load':'max', 'trip_id':'first'})
+        indices = _df.index.astype('int')
+        _df['y_classes'] = _df['load'].apply(lambda x: data_utils.get_class(x, dataset_selectbox))
             
         y_classes = _df['y_classes'].to_numpy()
         zero_arr[i, indices] = y_classes
@@ -64,11 +63,7 @@ def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity, dataset_s
     trip_id_df = trip_id_df.sort_index()
 
     res_df = res_df.sort_index()
-    bvals = [0, 1, 2, 3, 4, 5]
-    colors = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
     dcolorsc = discrete_colorscale(bvals, colors)
-    tickvals = [0, 1, 2, 3, 4, 5]
-    ticktext = ['low', 'med', 'med-high', 'high', 'very-high']
     hovertext = list()
     for yi, yy in enumerate(res_df.index):
         hovertext.append(list())
@@ -104,8 +99,8 @@ def plot_max_aggregate(vis_df, DATE_START, DATE_END, time_granularity, dataset_s
         xaxis_title="Max of aggregated 100th pct trip loads in the time window",
         yaxis_title="Active route id and directions",
         legend_title="Legend Title",
-        xaxis_tickformat='%H:%M:%S',
-        xaxis_hoverformat='%H:%M:%S',
+        xaxis_tickformat='%H:%M',
+        xaxis_hoverformat='%H:%M',
     )
 
     # fig.write_html(f"plots/{TIME_GRANULARITY}min_window_{DATE_START}.html")

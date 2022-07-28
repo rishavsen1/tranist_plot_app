@@ -19,7 +19,6 @@ st.sidebar.markdown("# Per Route-wise Statistics")
 
 # Everytime you change something here, the entire site will refresh.
 with st.sidebar:
-    use_case_selectbox = st.selectbox('Use case', ('Historical', 'Prediction'))
     dataset_selectbox = st.selectbox('Dataset', ('Chattanooga, CARTA', 'Nashville, MTA'))
     if dataset_selectbox == 'Chattanooga, CARTA':
         fp = os.path.join('data', 'CARTA_route_ids.csv')

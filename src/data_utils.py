@@ -1,7 +1,14 @@
 import math
 from pyspark.sql.types import IntegerType
 from pyspark.sql import functions as F
+import numpy as np
 
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+    
 def get_time_window(row, window, row_name='time_actual_arrive'):
     minute = row[row_name].minute
     minuteByWindow = minute//window
@@ -18,6 +25,28 @@ def get_class(x, dataset_selectbox):
         elif dataset_selectbox == 'Chattanooga, CARTA':
             if x >= s*40*0.01 and x <= e*40*0.01:
                 return i
+
+def get_percentile(lst, percentile):
+    try:
+        r = np.percentile(lst, percentile, interpolation='lower')
+    except:
+        r = None
+    return r
+
+def create_ix_map(df_train, df_test, col):
+    vals = df_train[col].values.tolist() + df_test[col].values.tolist()
+    vals = list(set(vals))
+    ix_map = {}
+    for i in range(len(vals)):
+        ix_map[vals[i]] = i
+    return ix_map
+
+def add_target_column_classification(df, target_column_regression, target_column_classification, class_bins):
+    vals = df[target_column_regression].values
+    percentiles = [get_percentile(vals, x) for x in class_bins]
+    percentiles = [(percentiles[0], percentiles[1]), (percentiles[1] + 1, percentiles[2]), (percentiles[2] + 1, percentiles[3])]
+    df[target_column_classification] = df[target_column_regression].apply(lambda x: get_class(x, percentiles))
+    return df, percentiles
 
 def remove_nulls_from_apc(apcdata):
     null_arrival_departure_times=apcdata.groupBy('transit_date', 'trip_id','vehicle_id','overload_id','block_abbr').agg((F.sum(F.col('arrival_time').isNull().cast("int")).alias('null_arrival_count')),F.count('*').alias('total_count'))

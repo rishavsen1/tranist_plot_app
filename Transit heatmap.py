@@ -10,15 +10,7 @@ from pyspark.sql import SparkSession
 st.markdown("# Transit Max Occupancy Heatmap")
 st.sidebar.markdown("# Parameters")
 
-spark = SparkSession.builder.config('spark.executor.cores', '8').config('spark.executor.memory', '40g')\
-        .config("spark.sql.session.timeZone", "UTC").config('spark.driver.memory', '20g').master("local[26]")\
-        .appName("wego-daily").config('spark.driver.extraJavaOptions', '-Duser.timezone=UTC').config('spark.executor.extraJavaOptions', '-Duser.timezone=UTC')\
-        .config("spark.sql.datetime.java8API.enabled", "true").config("spark.sql.execution.arrow.pyspark.enabled", "true")\
-        .getOrCreate()
-
 with st.sidebar:
-    st.write("Use case box not setup yet.")
-    use_case_selectbox = st.selectbox('Use case', ('Historical', 'Prediction'))
     dataset_selectbox = st.selectbox('Dataset', ('Chattanooga, CARTA', 'Nashville, MTA'))
     
     time_granularity = st.number_input('Aggregation time (in minutes)', value=60)
@@ -34,9 +26,12 @@ with st.sidebar:
                                     value=(dt.date(2021, 10, 18), dt.date(2021, 10, 19)))
         
     plot_button = st.button('Plot graph')
-    
-def route_dir_func(row):
-    return (row.route_id + row.row.route_direction_name)
+
+spark = SparkSession.builder.config('spark.executor.cores', '8').config('spark.executor.memory', '40g')\
+        .config("spark.sql.session.timeZone", "UTC").config('spark.driver.memory', '20g').master("local[26]")\
+        .appName("wego-daily").config('spark.driver.extraJavaOptions', '-Duser.timezone=UTC').config('spark.executor.extraJavaOptions', '-Duser.timezone=UTC')\
+        .config("spark.sql.datetime.java8API.enabled", "true").config("spark.sql.execution.arrow.pyspark.enabled", "true")\
+        .getOrCreate()
 
 if plot_button:
     if dataset_selectbox == 'Nashville, MTA':
@@ -66,10 +61,12 @@ if plot_button:
             apcdata_per_trip = data_utils.get_apc_per_trip_sparkview(spark)
             apcdata_per_trip = apcdata_per_trip.withColumnRenamed("route_id_direction","route_id_dir")
             apcdata_per_trip = apcdata_per_trip.drop("load")
+            apcdata_per_trip = apcdata_per_trip.withColumnRenamed("y_reg100","load")
             df = apcdata_per_trip.toPandas()
         elif dataset_selectbox == 'Chattanooga, CARTA':
             apcdata_per_trip=spark.sql(query)
             apcdata_per_trip = apcdata_per_trip.na.drop(subset=["time_actual_arrive"])
+            apcdata_per_trip = apcdata_per_trip.withColumnRenamed("time_actual_arrive","arrival_time")
             df = apcdata_per_trip.toPandas()
 
         st.dataframe(df.head())
