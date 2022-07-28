@@ -247,8 +247,9 @@ if plot_button:
 
         # Common code
         with tab_stops:
+            df_stop = df_stop.rename({'ons':'boardings'}, axis=1)
             st.write(f"boarding per stop per day in {agg_time} minute windows")
-            fig = px.box(df_stop, x="time_window_str", y="ons", facet_row='direction', color='direction', 
+            fig = px.box(df_stop, x="time_window_str", y="boardings", facet_row='direction', color='direction', 
                             boxmode="overlay", points=points)
             fig.update_xaxes(tickformat="%H:%M")
             layout = fig.update_layout(
