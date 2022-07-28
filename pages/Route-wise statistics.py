@@ -187,8 +187,7 @@ if plot_button:
             fig.update_yaxes(title='Delay (s)')
             layout = fig.update_layout(
                 title='Delays',
-                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M"),
-                yaxis_range=[-400, 10000]
+                xaxis=dict(title='Aggregation interval (hh:mm)', tickformat="%H:%M")
             )
             for a in fig.layout.annotations:
                 a.text = a.text.split("=")[1]
