@@ -63,7 +63,7 @@ def get_days_of_week(week_arr):
 def seconds_to_timestr(seconds, format='%H:%M:%S'):
     return time.strftime(format, time.gmtime(seconds))
 
-filepath = os.path.join(os.getcwd(), "data", 'cleaned-wego-daily.apc.parquet')
+filepath = os.path.join(os.getcwd(), "data", config.MTA_PARQUET_PREPROCESS)
 apcdata = spark.read.load(filepath)
 
 # add day and hour of day
@@ -223,5 +223,5 @@ null_arrival_departure_times=null_arrival_departure_times.withColumn('indicator'
 null_arrival_departure_times.count()
 
 apcdata.show(5)
-f = os.path.join(os.getcwd(), 'data', 'mta_apc_out.parquet')
+f = os.path.join(os.getcwd(), 'data', config.MTA_PARQUET)
 apcdata.write.partitionBy("year", 'month').mode("overwrite").parquet(f)
