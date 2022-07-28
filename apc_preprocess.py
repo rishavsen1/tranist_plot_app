@@ -20,7 +20,7 @@ import time
 import math
 from copy import deepcopy
 
-from src import config
+from transit_plot-app.src import config
 
 pd.set_option('display.max_columns', None)
 import pyspark
@@ -79,7 +79,7 @@ def seconds_to_timestr(seconds, format='%H:%M:%S'):
 # load the APC data
 
 '''Enter path name to APC data'''
-filepath = os.path.join(os.getcwd(), "data", "carta-apc.parquet")
+filepath = os.path.join(os.getcwd(), "data", config.CARTA_PARQUET_PREPROCESS)
 apcdata = spark.read.load(filepath)
 
 # add day and hour of day
@@ -125,4 +125,4 @@ apcdata = apcdata.withColumn('is_target', F.when(((F.col('actual_hdwy') / F.col(
 # apcdata.select('transit_date','year','month','hour','dayofweek',"route_id",'trip_id','stop_id','block_number','route_direction_name','dwell_time','load','offs','ons','time_actual_arrive','time_actual_depart','delay','time_scheduled','vehicle_id','stop_name','actual_hdwy','prev_sched').filter()
 # os.getcwd()
 
-apcdata.write.partitionBy("year", 'month').mode("overwrite").parquet('./transit_plot_app/data/carta_apc_out.parquet')
+apcdata.write.partitionBy("year", 'month').mode("overwrite").parquet('./transit_plot_app/data/{0}'.format(CARTA_PARQUET)
