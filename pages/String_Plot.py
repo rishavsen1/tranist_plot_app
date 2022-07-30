@@ -76,7 +76,14 @@ with st.sidebar:
         route_list = get_route_list(filter_date)
         route_option = st.selectbox('Route:', route_list)
         vehicle_list = get_vehicle_list(route_option)
-        vehicle_options = st.multiselect('Vehicles:', vehicle_list)
+        
+        container = st.container()
+        all = st.checkbox("Select All")
+        if all:
+            vehicle_options = container.multiselect("Vehicles:", vehicle_list, vehicle_list)
+        else:
+            vehicle_options =  container.multiselect("Vehicles:", vehicle_list)
+            
         vehicle_options = [str(v) for v in vehicle_options]
         
         data_options = st.selectbox('Data to show:', ['Boardings', 'Occupancy'])
@@ -85,30 +92,33 @@ with st.sidebar:
     plot_button = st.button('Plot graphs')
     
 if plot_button:
-    if dataset_selectbox == 'Chattanooga, CARTA':
-        st.error("Not yet prepared.")
+    if len(vehicle_options) == 0:
+        st.error("Select vehicle/s first.")
     else:
-        with st.spinner("Loading..."):
-            filepath = os.path.join(os.getcwd(), "data", config.MTA_PARQUET)
-            apcdata = spark.read.load(filepath)
-            apcdata.createOrReplaceTempView("apc")
+        if dataset_selectbox == 'Chattanooga, CARTA':
+            st.error("Not yet prepared.")
+        else:
+            with st.spinner("Loading..."):
+                filepath = os.path.join(os.getcwd(), "data", config.MTA_PARQUET)
+                apcdata = spark.read.load(filepath)
+                apcdata.createOrReplaceTempView("apc")
 
-            plot_date = filter_date.strftime('%Y-%m-%d')
-            # filter subset
-            query = f"""
-                    SELECT trip_id, gtfs_direction_id, arrival_time, transit_date, route_id, vehicle_id, ons, block_abbr,
-                        stop_name, stop_id_original, stop_sequence
-                    FROM apc
-                    WHERE (transit_date == '{plot_date}')
-                    ORDER BY arrival_time
-                    """
-            apcdata = spark.sql(query)
-            apcdata = apcdata.where(apcdata.route_id == route_option)
-            apcdata = apcdata.where(F.col("vehicle_id").isin(vehicle_options))
-            df = apcdata.toPandas()
-            df = assign_data_to_bins(df, data_options)
-            if data_options == 'Boardings':
-                fig = plot_utils.plot_string_boarding(df, vehicle_options)
-            else:
-                fig = plot_utils.plot_string_occupancy(df, filter_date, vehicle_options, predict_time)
-            st.plotly_chart(fig)
+                plot_date = filter_date.strftime('%Y-%m-%d')
+                # filter subset
+                query = f"""
+                        SELECT trip_id, gtfs_direction_id, arrival_time, transit_date, route_id, vehicle_id, ons, block_abbr,
+                            stop_name, stop_id_original, stop_sequence
+                        FROM apc
+                        WHERE (transit_date == '{plot_date}')
+                        ORDER BY arrival_time
+                        """
+                apcdata = spark.sql(query)
+                apcdata = apcdata.where(apcdata.route_id == route_option)
+                apcdata = apcdata.where(F.col("vehicle_id").isin(vehicle_options))
+                df = apcdata.toPandas()
+                df = assign_data_to_bins(df, data_options)
+                if data_options == 'Boardings':
+                    fig = plot_utils.plot_string_boarding(df, vehicle_options)
+                else:
+                    fig = plot_utils.plot_string_occupancy(df, filter_date, vehicle_options, predict_time)
+                st.plotly_chart(fig)

@@ -226,10 +226,10 @@ def plot_string_occupancy(df, plot_date, vehicle_options, predict_time=None):
             if not past_df.empty:
                 future_tdf = tdf[tdf['arrival_time'] > to_predict_df.iloc[-1]['arrival_time']]
                 tdf = tdf[tdf['arrival_time'] <= past_df.iloc[-1]['arrival_time']]
-                setup_fig_legend(fig, tdf)
                 plot_mta_markers_on_fig(fig, tdf, 'circle', v_idx, vehicle)
                 plot_mta_line_over_markers(fig, future_tdf, v_idx, vehicle, dash='dash', width=1)
                 plot_mta_markers_on_fig(fig, future_tdf, 'circle-open', v_idx, vehicle, name='no_info')
+                setup_fig_legend(fig, tdf)
             else:
                 future_tdf = deepcopy(tdf)
                 tdf = pd.DataFrame()
@@ -283,6 +283,7 @@ def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle, colorscale=colors, 
     if tdf0.empty:
         showlegend1 = True
     showlegend1 = False
+    direction = "To downtown"
     fig.add_trace(go.Scatter(x=tdf0['arrival_time'], y=tdf0['stop_sequence'],
                         mode='markers',
                         name=f"{name}:{vehicle}",
@@ -294,9 +295,11 @@ def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle, colorscale=colors, 
                         hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
                                         '<br><b>Stop Name</b>: %{customdata[1]}'+\
                                         '<br><b>Boardings</b>: %{customdata[2]}'+\
+                                        f'<br><b>Direction</b>: {direction}'+\
                                         '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')))
     ############################### FROM DOWNTOWN ###############################
     tdf1 = df[df['gtfs_direction_id'] == 1].reset_index(drop=True)
+    direction = "From downtown"
     fig.add_trace(go.Scatter(x=tdf1['arrival_time'], y=tdf1['stop_sequence'],
                         mode='markers',
                         name=f"{name}:{vehicle}",
@@ -309,5 +312,6 @@ def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle, colorscale=colors, 
                         hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
                                         '<br><b>Stop Name</b>: %{customdata[1]}'+\
                                         '<br><b>Boardings</b>: %{customdata[2]}'+\
+                                        f'<br><b>Direction</b>: {direction}'+\
                                         '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')), 
             secondary_y=True)
