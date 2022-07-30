@@ -51,7 +51,6 @@ def get_vehicle_list(route_option):
     return list(apcdata.select('vehicle_id').toPandas()['vehicle_id'])
 
 def assign_data_to_bins(df, data_option):
-    percentiles = [0, 33, 66, 100]
     if data_option == 'Boardings':
         bins = [-1, 6, 10, 15, 100]
         labels = [0, 1, 2, 3]
@@ -88,7 +87,7 @@ with st.sidebar:
         
         data_options = st.selectbox('Data to show:', ['Boardings', 'Occupancy'])
         if data_options == 'Occupancy':
-            predict_time = st.time_input('Time to predict:', dt.time(8, 45))
+            predict_time = st.time_input('Time to predict:', dt.time(12, 45))
     plot_button = st.button('Plot graphs')
     
 if plot_button:

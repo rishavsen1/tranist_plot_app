@@ -19,6 +19,7 @@ color_scale = ['rgba(254,237,222,1.0)',
                'rgba(253,141,60,1.0)',
                'rgba(217,71,1,1.0)']
 MARKER_SIZE = 12
+boardings_legend = {0:'0-6 pax', 1:'7-10 pax', 2:'11-15 pax', 3:'16-100 pax'}
 
 def discrete_colorscale(bvals, colors):
     """
@@ -131,7 +132,7 @@ def plot_prediction_heatmap(predict_date, prediction_df):
                 load = data
             hovertext[-1].append('Time: {}<br />Route: {}<br />Load: {}'.format(timestamp, yy, load))
 
-    dcolorsc = discrete_colorscale(bvals, colors)            
+    dcolorsc = discrete_colorscale(bvals, colors)
     fig = go.Figure(data=[go.Heatmap(z=prediction_df.to_numpy(), 
                                 xgap=0.5,
                                 ygap=0.5,
@@ -197,11 +198,12 @@ def plot_string_boarding(df, vehicle_options):
             break
         
         plot_mta_line_over_markers(fig, tdf, v_idx, vehicle)
-        plot_mta_markers_on_fig(fig, tdf, 'circle', v_idx, vehicle)
+        zero_bins_tdf = tdf[tdf['y_class'] == 0]
+        plot_mta_markers_on_fig(fig, zero_bins_tdf, 'circle', v_idx, name=f"VId:{vehicle}")
         for bin, _df in tdf.groupby('y_class'):
             if bin == 0:
                 continue
-            plot_mta_markers_on_fig(fig, _df, 'hexagram', bin, vehicle, colorscale=color_scale, name='hi-load')
+            plot_mta_markers_on_fig(fig, _df, 'hexagram', bin, vehicle, colorscale=color_scale, name=boardings_legend[bin])
         setup_fig_legend(fig, tdf)
     return fig
     
@@ -226,8 +228,11 @@ def plot_string_occupancy(df, plot_date, vehicle_options, predict_time=None):
             if not past_df.empty:
                 future_tdf = tdf[tdf['arrival_time'] > to_predict_df.iloc[-1]['arrival_time']]
                 tdf = tdf[tdf['arrival_time'] <= past_df.iloc[-1]['arrival_time']]
-                plot_mta_markers_on_fig(fig, tdf, 'circle', v_idx, vehicle)
+                
+                plot_mta_line_over_markers(fig, tdf, v_idx, vehicle)
                 plot_mta_line_over_markers(fig, future_tdf, v_idx, vehicle, dash='dash', width=1)
+                
+                plot_mta_markers_on_fig(fig, tdf, 'circle', v_idx, vehicle)
                 plot_mta_markers_on_fig(fig, future_tdf, 'circle-open', v_idx, vehicle, name='no_info')
                 setup_fig_legend(fig, tdf)
             else:
@@ -277,41 +282,41 @@ def plot_mta_line_over_markers(fig, df, v_idx, vehicle=None, dash='solid', width
                                 hoverinfo='none', fillcolor=colors[v_idx]), secondary_y=secondary)
         
 # TODO: Change direction and column names for uniformity with chattanooga
-def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle, colorscale=colors, size=MARKER_SIZE, name='Vehicle'):
+def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle=None, colorscale=colors, size=MARKER_SIZE, name='Vehicle'):
     ############################### TO DOWNTOWN ###############################
     tdf0 = df[df['gtfs_direction_id'] == 0].reset_index(drop=True)
     if tdf0.empty:
         showlegend1 = True
     showlegend1 = False
-    direction = "To downtown"
+    tdf0['direction'] = "To Downtown"
     fig.add_trace(go.Scatter(x=tdf0['arrival_time'], y=tdf0['stop_sequence'],
                         mode='markers',
-                        name=f"{name}:{vehicle}",
+                        name=f"{name}",
                         yaxis="y1",opacity=1.0, fillcolor='rgba(0, 0, 0, 1.0)',
                         marker_size=tdf0["valid"]*size, marker_symbol=symbol,
                         marker=dict(line=dict(color='black', width=1),opacity=1.0,
                                     color=colorscale[v_idx]),
-                        customdata  = np.stack((tdf0['vehicle_id'], tdf0['stop_name'], tdf0['ons']), axis=-1),
+                        customdata  = np.stack((tdf0['vehicle_id'], tdf0['stop_name'], tdf0['ons'], tdf0['direction']), axis=-1),
                         hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
                                         '<br><b>Stop Name</b>: %{customdata[1]}'+\
                                         '<br><b>Boardings</b>: %{customdata[2]}'+\
-                                        f'<br><b>Direction</b>: {direction}'+\
+                                        '<br><b>Direction</b>: →%{customdata[3]}'+\
                                         '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')))
     ############################### FROM DOWNTOWN ###############################
     tdf1 = df[df['gtfs_direction_id'] == 1].reset_index(drop=True)
-    direction = "From downtown"
+    tdf1['direction'] = "From Downtown"
     fig.add_trace(go.Scatter(x=tdf1['arrival_time'], y=tdf1['stop_sequence'],
                         mode='markers',
-                        name=f"{name}:{vehicle}",
+                        name=f"{name}",
                         showlegend = showlegend1,
                         yaxis="y2",opacity=1.0, fillcolor='rgba(0, 0, 0, 1.0)',
                         marker_size=tdf1["valid"]*size, marker_symbol=symbol,
                         marker=dict(line=dict(color='black', width=1),opacity=1.0,
                                     color=colorscale[v_idx]),
-                        customdata  = np.stack((tdf1['vehicle_id'], tdf1['stop_name'], tdf1['ons']), axis=-1),
+                        customdata  = np.stack((tdf1['vehicle_id'], tdf1['stop_name'], tdf1['ons'], tdf1['direction']), axis=-1),
                         hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
                                         '<br><b>Stop Name</b>: %{customdata[1]}'+\
                                         '<br><b>Boardings</b>: %{customdata[2]}'+\
-                                        f'<br><b>Direction</b>: {direction}'+\
+                                        '<br><b>Direction</b>: ←%{customdata[3]}'+\
                                         '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')), 
             secondary_y=True)
