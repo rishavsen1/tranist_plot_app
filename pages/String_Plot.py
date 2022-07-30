@@ -78,9 +78,10 @@ with st.sidebar:
         vehicle_list = get_vehicle_list(route_option)
         vehicle_options = st.multiselect('Vehicles:', vehicle_list)
         vehicle_options = [str(v) for v in vehicle_options]
-        predict_time = st.time_input('Time to predict:', dt.time(8, 45))
         
         data_options = st.selectbox('Data to show:', ['Boardings', 'Occupancy'])
+        if data_options == 'Occupancy':
+            predict_time = st.time_input('Time to predict:', dt.time(8, 45))
     plot_button = st.button('Plot graphs')
     
 if plot_button:
@@ -106,5 +107,8 @@ if plot_button:
             apcdata = apcdata.where(F.col("vehicle_id").isin(vehicle_options))
             df = apcdata.toPandas()
             df = assign_data_to_bins(df, data_options)
-            fig = plot_utils.plot_string_plot(df, filter_date, vehicle_options, data_options, predict_time)
+            if data_options == 'Boardings':
+                fig = plot_utils.plot_string_boarding(df, vehicle_options)
+            else:
+                fig = plot_utils.plot_string_occupancy(df, filter_date, vehicle_options, predict_time)
             st.plotly_chart(fig)
