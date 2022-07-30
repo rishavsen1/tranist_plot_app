@@ -19,6 +19,9 @@ st.sidebar.markdown("# Per Route-wise Statistics")
 
 tab_occupancy, tab_boarding, tab_headway, tab_delay, tab_stops = st.tabs(['Occupancy', 'Boardings', 'Headways', 'Delays', 'Stops'])
 
+CATEGORY_ORDERING = {'Nashville, MTA':['TO DOWNTOWN', 'FROM DOWNTOWN'],
+                     'Chattanooga, CARTA':['INBOUND', 'OUTBOUND']}
+
 # Everytime you change something here, the entire site will refresh.
 with st.sidebar:
     dataset_selectbox = st.selectbox('Dataset', ('Chattanooga, CARTA', 'Nashville, MTA'))
@@ -76,7 +79,7 @@ if plot_button:
                     GROUP BY transit_date, trip_id
                     ORDER BY arrival_time
                     """
-            apcdata_per_trip=spark.sql(query)
+            apcdata_per_trip = spark.sql(query)
             apcdata_per_trip = apcdata_per_trip.where(apcdata_per_trip.route_id == route_option)
             apcdata_per_trip = apcdata_per_trip.filter(F.col("transit_date").between(filter_date[0], filter_date[1]))
             apcdata_per_trip = apcdata_per_trip.withColumn("minute", F.minute("arrival_time"))
@@ -110,7 +113,7 @@ if plot_button:
                     GROUP BY transit_date, trip_id
                     ORDER BY time_actual_arrive
                     """
-            apcdata=spark.sql(query)
+            apcdata = spark.sql(query)
             apcdata = apcdata.where(apcdata.route_id == route_option)
             apcdata = apcdata.filter(F.col("transit_date").between(filter_date[0], filter_date[1]))
             apcdata = apcdata.na.drop(subset=["time_actual_arrive"])
@@ -127,8 +130,9 @@ if plot_button:
         df['time_window'] = df['time_window'].astype('int')
         df['time_window_str'] = df['time_window'].apply(lambda x: time_range[x])
         
-        st.dataframe(df.head())
-        st.dataframe(df.tail())
+        st.dataframe(df)
+        # st.dataframe(df.head())
+        # st.dataframe(df.tail())
         if df.empty:
             st.error("Dataframe is empty.")
             
@@ -136,7 +140,7 @@ if plot_button:
         with tab_occupancy:
             st.write(f"max occupancy in {agg_time} minute windows")
             fig = px.box(df, x="time_window_str", y="load", facet_row="direction", color="direction",
-                        boxmode="overlay", points=points)
+                        boxmode="overlay", points=points, category_orders={"direction": CATEGORY_ORDERING[dataset_selectbox]})
             fig.update_xaxes(tickformat="%H:%M")
             layout = fig.update_layout(
                 title='Max Occupancy',
@@ -150,7 +154,7 @@ if plot_button:
         with tab_boarding:
             st.write(f"boarding events in {agg_time} minute windows (scatter plot)")
             fig = px.box(df, x="time_window_str", y="boardings", facet_row="direction", color="direction",
-                            boxmode="overlay", points=points)
+                            boxmode="overlay", points=points, category_orders={"direction": CATEGORY_ORDERING[dataset_selectbox]})
             fig.update_xaxes(tickformat="%H:%M")
             layout = fig.update_layout(
                 title='Boardings',
@@ -164,7 +168,7 @@ if plot_button:
         with tab_headway:
             st.write(f"headway (average gap between trips) in {agg_time} minute windows")
             fig = px.box(df[df['headway'] <= 3 * 3600], x="time_window_str", y="headway", facet_row="direction", color='direction',
-                            boxmode="overlay", points=points)
+                            boxmode="overlay", points=points, category_orders={"direction": CATEGORY_ORDERING[dataset_selectbox]})
             fig.update_xaxes(tickformat="%H:%M")
             # fig.update_xaxes(tickformat="%H:%M", dtick=agg_time * 60 * 5)
             fig.update_yaxes(title='Headway (s)')
@@ -182,7 +186,7 @@ if plot_button:
         with tab_delay:
             st.write(f"delays (scheduled vs actual time at the arrival at a stop) in {agg_time} minute windows")
             fig = px.box(df[(df.delay > -300) & (df.delay < 3 * 3600)], x="time_window_str", y="delay", facet_row="direction", color='direction',
-                            boxmode="overlay", points=points)
+                            boxmode="overlay", points=points, category_orders={"direction": CATEGORY_ORDERING[dataset_selectbox]})
             fig.update_xaxes(tickformat="%H:%M")
             fig.update_yaxes(title='Delay (s)')
             layout = fig.update_layout(
@@ -249,7 +253,7 @@ if plot_button:
             df_stop = df_stop.rename({'ons':'boardings'}, axis=1)
             st.write(f"boarding per stop per day in {agg_time} minute windows")
             fig = px.box(df_stop, x="time_window_str", y="boardings", facet_row='direction', color='direction', 
-                            boxmode="overlay", points=points)
+                            boxmode="overlay", points=points, category_orders={"direction": CATEGORY_ORDERING[dataset_selectbox]})
             fig.update_xaxes(tickformat="%H:%M")
             layout = fig.update_layout(
                 title='Boardings per stop per time window',
