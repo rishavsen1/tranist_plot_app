@@ -4,6 +4,8 @@ from tensorflow.keras.layers import Dense, LSTM, Dropout
 from tensorflow import keras
 import numpy as np
 import pandas as pd
+from copy import deepcopy
+import datetime as dt
 
 def get_class(val, percentiles):
     for i, (min, max) in enumerate(percentiles):
@@ -108,3 +110,19 @@ def generate_simple_lstm_predictions(input_df, model, past, future):
         # Move future to remove used row
         future_df = future_df[1:]
     return predictions
+
+# route 3 vehicle 1830
+def setup_past_future_from_datetime(df, filter_datetime, past=5, future=10):
+    # time_now = dt.time(16, 35)
+    # For getting some time to base stop level prediction
+    # time_now = dt.datetime.now().time()
+    # datetime_now = dt.datetime.combine(filter_date, time_now)
+    tdf = deepcopy(df).dropna().reset_index()
+    tdf = tdf.sort_values('arrival_time').drop_duplicates('arrival_time',keep='last')
+    tdf.index = tdf['arrival_time']
+    idx = tdf.iloc[tdf.index.get_indexer([filter_datetime], method='nearest')]
+    past_idx = tdf.loc[idx.index]['index'].values[0]
+    print(past_idx)
+    if past_idx < past:
+        return pd.DataFrame(), pd.DataFrame()
+    return df.loc[past_idx - past:past_idx], df.loc[past_idx+1:past_idx+1 + future]
