@@ -12,14 +12,12 @@ colors = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
 tickvals = [0, 1, 2, 3, 4, 5]
 ticktext = ['low', 'med', 'med-high', 'high', 'very-high']
 
-colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99']
+line_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99']
 marker_edges = ['#f7f7f7','#cccccc','#969696','#525252', '#f7f7f7','#cccccc','#969696','#525252', '#f7f7f7','#cccccc','#969696']
-color_scale = ['rgba(254,237,222,1.0)', 
-               'rgba(253,190,133,1.0)',
-               'rgba(253,141,60,1.0)',
-               'rgba(217,71,1,1.0)']
 MARKER_SIZE = 12
-boardings_legend = {0:'0-6 pax', 1:'7-10 pax', 2:'11-15 pax', 3:'16-100 pax'}
+boardings_legend = {0:'0-5 pax', 1:'5-11 pax', 2:'12-16 pax', 3:'17-29 pax', 4:'30-100 pax'}
+# [(-1, 5), (5, 11), (11, 16), (16, 29), (29, 101)]
+color_scale = ['rgba(122,122,122,255)','rgba(254,204,92,255)','rgba(253,141,60,255)','rgba(240,59,32,255)','rgba(189,0,38,255)']
 
 def discrete_colorscale(bvals, colors):
     """
@@ -158,8 +156,8 @@ def plot_prediction_heatmap(predict_date, prediction_df):
     return fig
 
 # TODO: Might move to data utils
-def prepare_vehicle_route_data(df, vehicle):
-    tdf = df[(df['vehicle_id'] == vehicle)]
+def prepare_vehicle_route_data(df, vehicle_id):
+    tdf = df[(df['vehicle_id'] == vehicle_id)]
     # Fixing null arrival times (for completeness of axes labels)
     tdf['valid'] = 1
     tdf.loc[tdf['arrival_time'].isnull(), 'valid'] = 0
@@ -174,9 +172,8 @@ def prepare_vehicle_route_data(df, vehicle):
     tdf['arrival_time'] = pd.to_datetime(tdf['arrival_time'].interpolate('bfill'))
     tdf = tdf.sort_values(by=['arrival_time', 'stop_sequence'])
 
-    # TODO: Hard coded magic number
-    if len(tdf) < 30:
-        st.error(f"Vehicle {vehicle} has an empty dataset.")
+    if len(tdf) == 0:
+        st.error(f"Vehicle {vehicle_id} has an empty dataset.")
         return pd.DataFrame()
 
     # Fixing issues where last and first stops gets interchanged
@@ -189,73 +186,110 @@ def prepare_vehicle_route_data(df, vehicle):
     tdf = pd.concat(tdf_arr)
     return tdf
 
-def plot_string_boarding(df, vehicle_options):
+def plot_string_boarding(df):
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
-    for v_idx, vehicle in enumerate(vehicle_options):
-        tdf = prepare_vehicle_route_data(df, vehicle)
-        st.write(v_idx, vehicle)
-        st.dataframe(tdf)
+    for v_idx, (vehicle_id, vehicle_df) in enumerate(df.groupby('vehicle_id')):
+        tdf = prepare_vehicle_route_data(vehicle_df, vehicle_id)
         if tdf.empty:
             continue
         
-        plot_mta_line_over_markers(fig, tdf, v_idx, vehicle)
-        zero_bins_tdf = tdf[tdf['y_class'] == 0]
-        plot_mta_markers_on_fig(fig, zero_bins_tdf, 'circle', v_idx, name=f"VId:{vehicle}")
+        plot_mta_line_over_markers(fig, tdf, v_idx, vehicle_id, showlegend=True)
         for bin, _df in tdf.groupby('y_class'):
+            opacity = 0.8
             if bin > 0:
-                plot_mta_markers_on_fig(fig, _df, 'hexagram', bin, vehicle, colorscale=color_scale, name=boardings_legend[bin])
+                opacity = 1.0
+            plot_mta_markers_on_fig(fig, _df, 
+                                    marker_symbol='circle', 
+                                    marker_color=color_scale[bin], 
+                                    marker_size=MARKER_SIZE, 
+                                    legend_name=boardings_legend[bin],
+                                    opacity=opacity,
+                                    hover_bgcolor=color_scale[v_idx])
         setup_fig_legend(fig, tdf)
     return fig
     
-def plot_string_occupancy(df, plot_date, vehicle_options, predict_time=None):
+def plot_string_occupancy(df, plot_date, predict_time=None):    
+    past = 5
+    future = 10
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
-    for v_idx, vehicle in enumerate(vehicle_options):
-        tdf = prepare_vehicle_route_data(df, vehicle)
-        if tdf.empty:
-            continue
-        future_tdf = pd.DataFrame()
-        # TODO: Don't plot "future" markers
-        if predict_time:
+    for v_idx, (vehicle_id, vehicle_df) in enumerate(df.groupby('vehicle_id')):
+            tdf = prepare_vehicle_route_data(vehicle_df, vehicle_id)
+            if tdf.empty:
+                continue
+            future_tdf = pd.DataFrame()
+            # TODO: Don't plot "future" markers
             time_now = predict_time
-        else:
-            time_now = dt.time(10, 37)
-        datetime_now = dt.datetime.combine(plot_date, time_now)
-        if tdf.iloc[-1]['arrival_time'] > datetime_now:
-            past_df, to_predict_df = stop_level_utils.setup_past_future_from_datetime(tdf, datetime_now)
-            if not to_predict_df.empty:
-                plot_mta_markers_on_fig(fig, to_predict_df, 'hexagram-open', v_idx, vehicle, size=MARKER_SIZE+1, name='prediction')
-            if not past_df.empty:
-                future_tdf = tdf[tdf['arrival_time'] > to_predict_df.iloc[-1]['arrival_time']]
-                tdf = tdf[tdf['arrival_time'] <= past_df.iloc[-1]['arrival_time']]
-                
-                plot_mta_line_over_markers(fig, tdf, v_idx, vehicle)
-                plot_mta_line_over_markers(fig, future_tdf, v_idx, vehicle, dash='dash', width=1)
-                
-                plot_mta_markers_on_fig(fig, tdf, 'circle', v_idx, vehicle)
-                plot_mta_markers_on_fig(fig, future_tdf, 'circle-open', v_idx, vehicle, name='no_info')
-                setup_fig_legend(fig, tdf)
+            datetime_now = dt.datetime.combine(plot_date, time_now)
+            if tdf.iloc[-1]['arrival_time'] > datetime_now:
+                past_df, to_predict_df = stop_level_utils.setup_past_future_from_datetime(tdf, datetime_now, past=5, future=10)
+                if not past_df.empty:
+                    future_tdf = tdf[tdf['arrival_time'] > to_predict_df.iloc[-1]['arrival_time']]
+                    tdf = tdf[tdf['arrival_time'] <= past_df.iloc[-1]['arrival_time']]
+                    
+                    plot_mta_line_over_markers(fig, tdf, v_idx, vehicle_id, showlegend=True)
+                    plot_mta_line_over_markers(fig, future_tdf, v_idx, vehicle_id, dash='dash', width=1)
+                    
+                    for bin, _df in tdf.groupby('y_class'):
+                        opacity = 0.8
+                        if bin > 0:
+                            opacity = 1.0
+                        plot_mta_markers_on_fig(fig, _df, 
+                                                marker_symbol='circle', 
+                                                marker_color=color_scale[bin], 
+                                                marker_size=MARKER_SIZE, 
+                                                legend_name=boardings_legend[bin],
+                                                opacity=opacity,
+                                                hover_bgcolor=color_scale[bin],
+                                                data_column='load')
+                    plot_mta_markers_on_fig(fig, future_tdf, 'circle-open', showlegend=False, 
+                                            marker_color=line_colors[v_idx])
+                    
+                    setup_fig_legend(fig, tdf)
+                else:
+                    future_tdf = deepcopy(tdf)
+                    tdf = pd.DataFrame()
+                    setup_fig_legend(fig, future_tdf)
+                if not to_predict_df.empty:
+                    plot_mta_line_over_markers(fig, to_predict_df, v_idx, vehicle_id, dash='solid', width=3)
+                    
+                    ### PREDICTION ###
+                    input_df = pd.concat([past_df, to_predict_df])
+                    keep_columns=['route_id_dir', 'trip_id']
+                    input_df = stop_level_utils.prepare_input_data(input_df, keep_columns=keep_columns)
+                    input_df = input_df.drop(columns=keep_columns)
+                    num_features = input_df.shape[1]
+                    model = stop_level_utils.get_model(num_features)
+
+                    y_pred = stop_level_utils.generate_simple_lstm_predictions(input_df, model, past, future)
+                    to_predict_df['y_class'] = y_pred
+                    
+                    plot_mta_markers_on_fig(fig, to_predict_df, 
+                                            marker_symbol='square', 
+                                            marker_color=color_scale[v_idx], 
+                                            marker_size=MARKER_SIZE, 
+                                            legend_name='prediction',
+                                            hover_bgcolor=line_colors[v_idx],
+                                            data_column='y_class')
             else:
-                future_tdf = deepcopy(tdf)
-                tdf = pd.DataFrame()
-                setup_fig_legend(fig, future_tdf)
-            
+                st.error("Too early to predict")
     return fig
 
 def setup_fig_legend(fig, tdf):
-    tdf0 = tdf[tdf['gtfs_direction_id'] == 0].reset_index(drop=True)
-    tdf1 = tdf[tdf['gtfs_direction_id'] == 1].reset_index(drop=True)
-        
+    tdf0 = tdf[tdf['plot_no'] == 0].reset_index(drop=True)
+    tdf1 = tdf[tdf['plot_no'] == 1].reset_index(drop=True)
     if not tdf0.empty:
-        tdf0_dict = dict(title="TO DOWNTOWN",
+        title = "TO DOWNTOWN" if tdf0.iloc[0]['gtfs_direction_id'] == 0 else "FROM DOWNTOWN"
+        tdf0_dict = dict(title=title,
                          tickmode = 'array',
                          tickvals = tdf0.iloc[0:tdf0['stop_sequence'].max()].stop_sequence.tolist(),
                          ticktext = tdf0.iloc[0:tdf0['stop_sequence'].max()].stop_id_original.tolist())
     else:
         tdf0_dict = {}
     if not tdf1.empty:
-        tdf1_dict = dict(title="FROM DOWNTOWN",
+        title = "TO DOWNTOWN" if tdf1.iloc[0]['gtfs_direction_id'] == 0 else "FROM DOWNTOWN"
+        tdf1_dict = dict(title=title,
                          tickmode = 'array',
                          tickvals = tdf1.iloc[0:tdf1['stop_sequence'].max()].stop_sequence.tolist(),
                          ticktext = tdf1.iloc[0:tdf1['stop_sequence'].max()].stop_id_original.tolist())
@@ -264,60 +298,61 @@ def setup_fig_legend(fig, tdf):
         
     fig.update_layout(showlegend=True, 
                         # width=1500, height=1000,
-                        yaxis = tdf0_dict,
-                        yaxis2 = tdf1_dict,
-                        legend={'traceorder':'normal'})
+                      yaxis = tdf0_dict,
+                      yaxis2 = tdf1_dict,
+                      legend={'traceorder':'normal'})
     
-def plot_mta_line_over_markers(fig, df, v_idx, vehicle=None, dash='solid', width=4):
+def plot_mta_line_over_markers(fig, df, v_idx, vehicle=None, dash='solid', width=4, showlegend=False):
         # Plotting a line through the markers
     for t, t_id_df in df.groupby('trip_id'):
-        if t_id_df['gtfs_direction_id'].any() == 1:
+        if t_id_df['plot_no'].any() == 1:
             secondary = True
         else:
             secondary = False
         valid_tdf = t_id_df[t_id_df['valid'] == 1]
         fig.add_trace(go.Scatter(x=valid_tdf['arrival_time'], y=valid_tdf['stop_sequence'],
-                                line=dict(color=colors[v_idx], width=width, dash=dash),
+                                 opacity=1.0,
+                                line=dict(color=line_colors[v_idx], width=width, dash=dash),
                                 mode='lines', 
-                                showlegend = False,
-                                hoverinfo='none', fillcolor=colors[v_idx]), secondary_y=secondary)
+                                showlegend=showlegend,
+                                name=f"trip:{t}",
+                                hoverinfo='none', fillcolor=line_colors[v_idx]), secondary_y=secondary)
         
 # TODO: Change direction and column names for uniformity with chattanooga
-def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle=None, colorscale=colors, size=MARKER_SIZE, name='Vehicle'):
+# def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle=None, colorscale=line_colors, size=MARKER_SIZE, name='Vehicle', opacity=1.0):
+def plot_mta_markers_on_fig(fig, df, marker_symbol, marker_color, marker_size=MARKER_SIZE, legend_name='Vehicle', opacity=1.0, hover_bgcolor=None, showlegend=True, data_column='ons'):
     ############################### TO DOWNTOWN ###############################
-    tdf0 = df[df['gtfs_direction_id'] == 0].reset_index(drop=True)
-    if tdf0.empty:
-        showlegend1 = True
-    showlegend1 = False
-    tdf0['direction'] = "To Downtown"
+    tdf0 = df[df['plot_no'] == 0].reset_index(drop=True)
+    tdf0['direction'] = "→To Downtown" if (tdf0['gtfs_direction_id'] == 0).any() else "←From Downtown"
     fig.add_trace(go.Scatter(x=tdf0['arrival_time'], y=tdf0['stop_sequence'],
-                        mode='markers',
-                        name=f"{name}",
-                        yaxis="y1",opacity=1.0, fillcolor='rgba(0, 0, 0, 1.0)',
-                        marker_size=tdf0["valid"]*size, marker_symbol=symbol,
-                        marker=dict(line=dict(color='black', width=1),opacity=1.0,
-                                    color=colorscale[v_idx]),
-                        customdata  = np.stack((tdf0['vehicle_id'], tdf0['stop_name'], tdf0['ons'], tdf0['direction']), axis=-1),
-                        hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
-                                        '<br><b>Stop Name</b>: %{customdata[1]}'+\
-                                        '<br><b>Boardings</b>: %{customdata[2]}'+\
-                                        '<br><b>Direction</b>: →%{customdata[3]}'+\
-                                        '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')))
+                             mode='markers',
+                             name=f"left {legend_name}",
+                             yaxis="y1", opacity=opacity, fillcolor='rgba(0, 0, 0, 1.0)',
+                             marker_size=tdf0["valid"]*marker_size, marker_symbol=marker_symbol,
+                             marker=dict(line=dict(color='black', width=1.5), opacity=opacity, color=marker_color),
+                             showlegend=showlegend,
+                             customdata  = np.stack((tdf0['vehicle_id'], tdf0['stop_name'], tdf0[data_column], tdf0['direction']), axis=-1),
+                             hoverlabel = dict(bgcolor=hover_bgcolor),
+                             hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
+                                              '<br><b>Stop Name</b>: %{customdata[1]}'+\
+                                              '<br><b>Data</b>: %{customdata[2]}'+\
+                                              '<br><b>Direction</b>: %{customdata[3]}'+\
+                                             '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')))
     ############################### FROM DOWNTOWN ###############################
-    tdf1 = df[df['gtfs_direction_id'] == 1].reset_index(drop=True)
-    tdf1['direction'] = "From Downtown"
+    tdf1 = df[df['plot_no'] == 1].reset_index(drop=True)
+    tdf1['direction'] = "→To Downtown" if (tdf1['gtfs_direction_id'] == 0).any() else "←From Downtown"
     fig.add_trace(go.Scatter(x=tdf1['arrival_time'], y=tdf1['stop_sequence'],
                         mode='markers',
-                        name=f"{name}",
-                        showlegend = showlegend1,
-                        yaxis="y2",opacity=1.0, fillcolor='rgba(0, 0, 0, 1.0)',
-                        marker_size=tdf1["valid"]*size, marker_symbol=symbol,
-                        marker=dict(line=dict(color='black', width=1),opacity=1.0,
-                                    color=colorscale[v_idx]),
-                        customdata  = np.stack((tdf1['vehicle_id'], tdf1['stop_name'], tdf1['ons'], tdf1['direction']), axis=-1),
+                        name=f"right {legend_name}",
+                        yaxis="y2", opacity=opacity, fillcolor='rgba(0, 0, 0, 1.0)',
+                        marker_size=tdf1["valid"]*marker_size, marker_symbol=marker_symbol,
+                        marker=dict(line=dict(color='black', width=1.5), opacity=opacity, color=marker_color),
+                        showlegend=showlegend,
+                        customdata  = np.stack((tdf1['vehicle_id'], tdf1['stop_name'], tdf1[data_column], tdf1['direction']), axis=-1),
+                        hoverlabel = dict(bgcolor=hover_bgcolor),
                         hovertemplate = ('<i>Vehicle ID</i>: %{customdata[0]}'+\
                                         '<br><b>Stop Name</b>: %{customdata[1]}'+\
-                                        '<br><b>Boardings</b>: %{customdata[2]}'+\
-                                        '<br><b>Direction</b>: ←%{customdata[3]}'+\
+                                        '<br><b>Data</b>: %{customdata[2]}'+\
+                                        '<br><b>Direction</b>: %{customdata[3]}'+\
                                         '<br><b>Time</b>: %{x|%H:%M:%S}<br><extra></extra>')), 
             secondary_y=True)

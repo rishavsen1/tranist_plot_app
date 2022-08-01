@@ -125,4 +125,4 @@ def setup_past_future_from_datetime(df, filter_datetime, past=5, future=10):
     print(past_idx)
     if past_idx < past:
         return pd.DataFrame(), pd.DataFrame()
-    return df.loc[past_idx - past:past_idx], df.loc[past_idx+1:past_idx+1 + future]
+    return df.dropna().loc[past_idx - past:past_idx-1][0:past], df.dropna().loc[past_idx:past_idx + future-1][0:future]
