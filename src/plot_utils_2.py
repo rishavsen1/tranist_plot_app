@@ -213,6 +213,9 @@ def plot_string_boarding(df):
 def plot_string_occupancy(df, plot_date, predict_time=None):    
     past = 5
     future = 10
+    
+    occupancy_legend = {0:'0-6 pax', 1:'7-12 pax', 2:'13-100 pax'}
+        
     fig = make_subplots(specs=[[{"secondary_y": True}]])
     
     for v_idx, (vehicle_id, vehicle_df) in enumerate(df.groupby('vehicle_id')):
@@ -240,7 +243,7 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
                                                 marker_symbol='circle', 
                                                 marker_color=color_scale[bin], 
                                                 marker_size=MARKER_SIZE, 
-                                                legend_name=boardings_legend[bin],
+                                                legend_name=occupancy_legend[bin],
                                                 opacity=opacity,
                                                 hover_bgcolor=color_scale[bin],
                                                 data_column='load')
@@ -268,13 +271,17 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
                         y_pred = stop_level_utils.generate_simple_lstm_predictions(input_df, model, past, future)
                         to_predict_df['y_class'] = y_pred
                         
-                        plot_mta_markers_on_fig(fig, to_predict_df, 
-                                                marker_symbol='square', 
-                                                marker_color=color_scale[v_idx], 
-                                                marker_size=MARKER_SIZE, 
-                                                legend_name='prediction',
-                                                hover_bgcolor=line_colors[v_idx],
-                                                data_column='y_class')
+                        for bin, _df in to_predict_df.groupby('y_class'):
+                            opacity = 0.8
+                            if bin > 0:
+                                opacity = 1.0
+                            plot_mta_markers_on_fig(fig, to_predict_df, 
+                                                    marker_symbol='square', 
+                                                    marker_color=color_scale[bin], 
+                                                    marker_size=MARKER_SIZE, 
+                                                    legend_name=occupancy_legend[bin],
+                                                    hover_bgcolor=line_colors[v_idx],
+                                                    data_column='y_class')
                     else:
                         st.error("Past dataframe is empty.")
             else:

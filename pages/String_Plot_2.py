@@ -36,7 +36,7 @@ def assign_data_to_bins(df, data_option):
         mycut = pd.cut(df['ons'].tolist(), bins=bins)
     if data_option == 'Occupancy':
         bins = pd.IntervalIndex.from_tuples([(-1, 6), (6, 12), (12, 100)])
-        mycut = pd.cut(df['ons'].tolist(), bins=bins)
+        mycut = pd.cut(df['load'].tolist(), bins=bins)
         
     df['y_class'] = mycut.codes
     return df
