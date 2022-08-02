@@ -199,13 +199,14 @@ def plot_string_boarding(df):
             opacity = 0.8
             if bin > 0:
                 opacity = 1.0
+            _df = _df[_df['valid'] == 1]
             plot_mta_markers_on_fig(fig, _df, 
                                     marker_symbol='circle', 
                                     marker_color=color_scale[bin], 
                                     marker_size=MARKER_SIZE, 
                                     legend_name=boardings_legend[bin],
                                     opacity=opacity,
-                                    hover_bgcolor=color_scale[v_idx])
+                                    hover_bgcolor=line_colors[v_idx])
         setup_fig_legend(fig, tdf)
     return fig
     
@@ -255,23 +256,27 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
                     plot_mta_line_over_markers(fig, to_predict_df, v_idx, vehicle_id, dash='solid', width=3)
                     
                     ### PREDICTION ###
-                    input_df = pd.concat([past_df, to_predict_df])
-                    keep_columns=['route_id_dir', 'trip_id']
-                    input_df = stop_level_utils.prepare_input_data(input_df, keep_columns=keep_columns)
-                    input_df = input_df.drop(columns=keep_columns)
-                    num_features = input_df.shape[1]
-                    model = stop_level_utils.get_model(num_features)
+                    if not past_df.empty:
+                        input_df = pd.concat([past_df, to_predict_df])
+                        
+                        keep_columns=['route_id_dir', 'trip_id']
+                        input_df = stop_level_utils.prepare_input_data(input_df, keep_columns=keep_columns)
+                        input_df = input_df.drop(columns=keep_columns)
+                        num_features = input_df.shape[1]
+                        model = stop_level_utils.get_model(num_features)
 
-                    y_pred = stop_level_utils.generate_simple_lstm_predictions(input_df, model, past, future)
-                    to_predict_df['y_class'] = y_pred
-                    
-                    plot_mta_markers_on_fig(fig, to_predict_df, 
-                                            marker_symbol='square', 
-                                            marker_color=color_scale[v_idx], 
-                                            marker_size=MARKER_SIZE, 
-                                            legend_name='prediction',
-                                            hover_bgcolor=line_colors[v_idx],
-                                            data_column='y_class')
+                        y_pred = stop_level_utils.generate_simple_lstm_predictions(input_df, model, past, future)
+                        to_predict_df['y_class'] = y_pred
+                        
+                        plot_mta_markers_on_fig(fig, to_predict_df, 
+                                                marker_symbol='square', 
+                                                marker_color=color_scale[v_idx], 
+                                                marker_size=MARKER_SIZE, 
+                                                legend_name='prediction',
+                                                hover_bgcolor=line_colors[v_idx],
+                                                data_column='y_class')
+                    else:
+                        st.error("Past dataframe is empty.")
             else:
                 st.error("Too early to predict")
     return fig

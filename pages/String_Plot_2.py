@@ -18,7 +18,8 @@ def get_block_abbr_list(apcdata):
     apcdata = apcdata.sort(apcdata.block_abbr)
     return [r[0] for r in apcdata.select('block_abbr').distinct().toLocalIterator()]
     
-def get_route_list(apcdata):
+def get_route_list(apcdata, block_abbr):
+    apcdata = apcdata.filter(apcdata.block_abbr.isin(block_abbr))
     apcdata = apcdata.dropDuplicates(["route_id"])
     apcdata = apcdata.sort(apcdata.route_id)
     return list(apcdata.select('route_id').toPandas()['route_id'])
@@ -41,6 +42,7 @@ def assign_data_to_bins(df, data_option):
     return df
 
 def get_apc_data_for_date(filter_date):
+    print("Running this...")
     filepath = os.path.join(os.getcwd(), "data", config.MTA_PARQUET)
     apcdata = spark.read.load(filepath)
     apcdata.createOrReplaceTempView("apc")
@@ -73,6 +75,7 @@ st.title("String Plots")
 st.sidebar.markdown("# Parameters")
 
 with st.sidebar:
+    sidebar_container = st.container()
     dataset_selectbox = st.selectbox('Dataset', ('Nashville, MTA', 'Chattanooga, CARTA'))
     if dataset_selectbox == 'Chattanooga, CARTA':
         fp = os.path.join('data', 'CARTA_route_ids.csv')
@@ -90,14 +93,14 @@ with st.sidebar:
     data_options = st.selectbox('Data to show:', ['Boardings', 'Occupancy'])
     if data_options == 'Occupancy':
         predict_time = st.time_input('Time to predict:', dt.time(12, 45))
-container = st.container()
 
+container = st.container()
 col1, col2 = container.columns(2)
 with col1:
     st.subheader("First Y-Axis")
     enable1 = st.checkbox('Enable1?', True)
     if enable1:
-        route_list1 = get_route_list(apcdata)
+        route_list1 = get_route_list(apcdata, block_option)
         route_option1 = st.selectbox('Route1:', route_list1)
         direction_option_label1 = st.radio("Direction1:", ["To Downtown", "From Downtown"], horizontal=True)
         direction_option1 = 0 if direction_option_label1 == "To Downtown" else 1
@@ -114,7 +117,7 @@ with col2:
     st.subheader("Second Y-Axis")
     enable2 = st.checkbox('Enable2?', True)
     if enable2:
-        route_list2 = get_route_list(apcdata)
+        route_list2 = get_route_list(apcdata, block_option)
         route_option2 = st.selectbox('Route2:', route_list2)
         direction_option_label2 = st.radio("Direction2:", ["From Downtown", "To Downtown"], horizontal=True)
         direction_option2 = 0 if direction_option_label2 == "To Downtown" else 1
@@ -165,6 +168,8 @@ if plot_button:
             vehicle_options = vehicle_options2
         df = assign_data_to_bins(df, data_options)
         
+        # st.dataframe(df.dropna())
+        # st.write(df.dropna().shape)
         if data_options == 'Boardings':
             fig = plot_utils.plot_string_boarding(df)
         else:
