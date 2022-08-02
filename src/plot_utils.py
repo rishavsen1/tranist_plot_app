@@ -12,7 +12,7 @@ colors = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
 tickvals = [0, 1, 2, 3, 4, 5]
 ticktext = ['low', 'med', 'med-high', 'high', 'very-high']
 
-colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99']
+line_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99']
 marker_edges = ['#f7f7f7','#cccccc','#969696','#525252', '#f7f7f7','#cccccc','#969696','#525252', '#f7f7f7','#cccccc','#969696']
 color_scale = ['rgba(254,237,222,1.0)', 
                'rgba(253,190,133,1.0)',
@@ -277,10 +277,10 @@ def plot_mta_line_over_markers(fig, df, v_idx, vehicle=None, dash='solid', width
             secondary = False
         valid_tdf = t_id_df[t_id_df['valid'] == 1]
         fig.add_trace(go.Scatter(x=valid_tdf['arrival_time'], y=valid_tdf['stop_sequence'],
-                                line=dict(color=colors[v_idx], width=width, dash=dash),
+                                line=dict(color=line_colors[v_idx], width=width, dash=dash),
                                 mode='lines', 
                                 showlegend = False,
-                                hoverinfo='none', fillcolor=colors[v_idx]), secondary_y=secondary)
+                                hoverinfo='none', fillcolor=line_colors[v_idx]), secondary_y=secondary)
         
 # TODO: Change direction and column names for uniformity with chattanooga
 def plot_mta_markers_on_fig(fig, df, symbol, v_idx, vehicle=None, colorscale=colors, size=MARKER_SIZE, name='Vehicle'):

@@ -1,12 +1,10 @@
-from pyspark.sql import functions as F
-from sklearn.metrics import mean_squared_error
 from src.config import *
 from src import data_utils
 from sklearn.preprocessing import OneHotEncoder
 import joblib
 import pandas as pd
+import datetime as dt
 import numpy as np
-import random
 
 def convert_pandas_dow_to_pyspark(pandas_dow):
     return (pandas_dow + 1) % 7 + 1
@@ -166,6 +164,10 @@ def setup_day_ahead_data(DATE_TO_PREDICT, past_df, darksky, holidays_df, TARGET=
     DAY_OF_WEEK = convert_pandas_dow_to_pyspark(pd.Timestamp(DATE_TO_PREDICT).day_of_week)
     a = past_df.groupby(['route_id_direction', 'time_window']).agg({'actual_headways':list, 'scheduled_headway': list, TARGET: list})
     a['hour'] = a.index.get_level_values('time_window') // 2
+    # TODO: Hack since we don't always have up-to-date weather data for testing
+    weather_last_datetime = dt.date(2022, 4, 6)
+    if DATE_TO_PREDICT > weather_last_datetime:
+        DATE_TO_PREDICT = weather_last_datetime
     d = darksky[['hour', 'darksky_temperature', 'darksky_humidity', 'darksky_precipitation_intensity']]
     d = darksky[(darksky['year']==pd.Timestamp(DATE_TO_PREDICT).year) & 
                 (darksky['month']==pd.Timestamp(DATE_TO_PREDICT).month) & 
