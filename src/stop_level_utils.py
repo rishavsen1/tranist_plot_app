@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from copy import deepcopy
 import datetime as dt
+import streamlit as st
 
 def get_class(val, percentiles):
     for i, (min, max) in enumerate(percentiles):
@@ -111,7 +112,7 @@ def generate_simple_lstm_predictions(input_df, model, past, future):
         future_df = future_df[1:]
     return predictions
 
-# route 3 vehicle 1830
+# TODO: Some data for stops have N/A in certain columns like schedhdway, reducing them to unusablity.
 def setup_past_future_from_datetime(df, filter_datetime, past=5, future=10):
     # time_now = dt.time(16, 35)
     # For getting some time to base stop level prediction
@@ -122,7 +123,15 @@ def setup_past_future_from_datetime(df, filter_datetime, past=5, future=10):
     tdf.index = tdf['arrival_time']
     idx = tdf.iloc[tdf.index.get_indexer([filter_datetime], method='nearest')]
     past_idx = tdf.loc[idx.index]['index'].values[0]
-    print(past_idx)
+    
+    # st.write(idx.iloc[0]['arrival_time'])
+    
+    # HACK
+    df = df[df['valid'] == 1].reset_index(drop=True)
+    past_idx = df[df['arrival_time'] == idx.iloc[0]['arrival_time']].index.values[0]
+    # st.write(past_idx)
+    # st.dataframe(df.loc[past_idx - past:past_idx-1])
+
     if past_idx < past:
         return pd.DataFrame(), pd.DataFrame()
-    return df.dropna().loc[past_idx - past:past_idx-1][0:past], df.dropna().loc[past_idx:past_idx + future-1][0:future]
+    return df.loc[past_idx - past:past_idx-1][0:past], df.loc[past_idx:past_idx + future-1][0:future]

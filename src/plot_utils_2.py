@@ -196,16 +196,12 @@ def plot_string_boarding(df):
         
         plot_mta_line_over_markers(fig, tdf, v_idx, vehicle_id, showlegend=True)
         for bin, _df in tdf.groupby('y_class'):
-            opacity = 0.8
-            if bin > 0:
-                opacity = 1.0
             _df = _df[_df['valid'] == 1]
             plot_mta_markers_on_fig(fig, _df, 
                                     marker_symbol='circle', 
                                     marker_color=color_scale[bin], 
                                     marker_size=MARKER_SIZE, 
                                     legend_name=boardings_legend[bin],
-                                    opacity=opacity,
                                     hover_bgcolor=line_colors[v_idx])
         setup_fig_legend(fig, tdf)
     return fig
