@@ -103,7 +103,7 @@ with col1:
         route_list1 = get_route_list(apcdata, block_option)
         route_option1 = st.selectbox('Route1:', route_list1)
         direction_option_label1 = st.radio("Direction1:", ["To Downtown", "From Downtown"], horizontal=True)
-        direction_option1 = 0 if direction_option_label1 == "To Downtown" else 1
+        direction_option1 = 1 if direction_option_label1 == "To Downtown" else 0
 
         container_in1 = st.container()
         all1 = st.checkbox("Select All1")
@@ -120,7 +120,7 @@ with col2:
         route_list2 = get_route_list(apcdata, block_option)
         route_option2 = st.selectbox('Route2:', route_list2)
         direction_option_label2 = st.radio("Direction2:", ["From Downtown", "To Downtown"], horizontal=True)
-        direction_option2 = 0 if direction_option_label2 == "To Downtown" else 1
+        direction_option2 = 1 if direction_option_label2 == "To Downtown" else 0
 
         container_in2 = st.container()
         all2 = st.checkbox("Select All2")
@@ -155,7 +155,7 @@ if plot_button:
             df2['plot_no'] = 1
         
         if enable1 and enable2:
-            if direction_option1 == direction_option2:
+            if (direction_option1 == direction_option2) and (vehicle_options1 == vehicle_options2):
                 df = df1
             else:
                 df = pd.concat([df1, df2])
@@ -168,12 +168,18 @@ if plot_button:
             vehicle_options = vehicle_options2
         df = assign_data_to_bins(df, data_options)
         
-        # st.dataframe(df.dropna())
+        # st.write(df.vehicle_id.unique())
         # st.write(df.dropna().shape)
         if data_options == 'Boardings':
             fig = plot_utils.plot_string_boarding(df)
         else:
             fig = plot_utils.plot_string_occupancy(df, filter_date, predict_time)
-            
-    fig.update_layout(title=f'{data_options} for Block: {block_option}, Route: {route_option1} {direction_option_label1} and {route_option2} {direction_option_label2}')
+    
+    if enable1 and enable2:
+        fig.update_layout(title=f'{data_options} for Block: {block_option}, Route: {route_option1} {direction_option_label1} and {route_option2} {direction_option_label2}')
+    elif enable1 and not enable2:
+        fig.update_layout(title=f'{data_options} for Block: {block_option}, Route: {route_option1} {direction_option_label1}')
+    elif not enable1 and enable2:
+        fig.update_layout(title=f'{data_options} for Block: {block_option}, Route: {route_option2} {direction_option_label2}')
+    
     st.plotly_chart(fig)

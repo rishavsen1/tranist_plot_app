@@ -217,7 +217,6 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
     occupancy_legend = {0:'0-6 pax', 1:'7-12 pax', 2:'13-100 pax'}
         
     fig = make_subplots(specs=[[{"secondary_y": True}]])
-    
     for v_idx, (vehicle_id, vehicle_df) in enumerate(df.groupby('vehicle_id')):
             tdf = prepare_vehicle_route_data(vehicle_df, vehicle_id)
             if tdf.empty:
@@ -227,6 +226,7 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
             time_now = predict_time
             datetime_now = dt.datetime.combine(plot_date, time_now)
             if tdf.iloc[-1]['arrival_time'] > datetime_now:
+                tdf = tdf.sort_values(by=['arrival_time', 'orig_ss'])
                 past_df, to_predict_df = stop_level_utils.setup_past_future_from_datetime(tdf, datetime_now, past=5, future=10)
                 if not past_df.empty:
                     future_tdf = tdf[tdf['arrival_time'] > to_predict_df.iloc[-1]['arrival_time']]
@@ -236,16 +236,13 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
                     plot_mta_line_over_markers(fig, future_tdf, v_idx, vehicle_id, dash='dash', width=1)
                     
                     for bin, _df in tdf.groupby('y_class'):
-                        opacity = 0.8
-                        if bin > 0:
-                            opacity = 1.0
                         plot_mta_markers_on_fig(fig, _df, 
                                                 marker_symbol='circle', 
                                                 marker_color=color_scale[bin], 
                                                 marker_size=MARKER_SIZE, 
                                                 legend_name=occupancy_legend[bin],
-                                                opacity=opacity,
-                                                hover_bgcolor=color_scale[bin],
+                                                opacity=1.0,
+                                                hover_bgcolor=line_colors[v_idx],
                                                 data_column='load')
                     plot_mta_markers_on_fig(fig, future_tdf, 'circle-open', showlegend=False, 
                                             marker_color=line_colors[v_idx])
@@ -272,10 +269,7 @@ def plot_string_occupancy(df, plot_date, predict_time=None):
                         to_predict_df['y_class'] = y_pred
                         
                         for bin, _df in to_predict_df.groupby('y_class'):
-                            opacity = 0.8
-                            if bin > 0:
-                                opacity = 1.0
-                            plot_mta_markers_on_fig(fig, to_predict_df, 
+                            plot_mta_markers_on_fig(fig, _df, 
                                                     marker_symbol='square', 
                                                     marker_color=color_scale[bin], 
                                                     marker_size=MARKER_SIZE, 
@@ -292,7 +286,7 @@ def setup_fig_legend(fig, tdf):
     tdf0 = tdf[tdf['plot_no'] == 0].reset_index(drop=True)
     tdf1 = tdf[tdf['plot_no'] == 1].reset_index(drop=True)
     if not tdf0.empty:
-        title = "TO DOWNTOWN" if tdf0.iloc[0]['gtfs_direction_id'] == 0 else "FROM DOWNTOWN"
+        title = "TO DOWNTOWN" if tdf0.iloc[0]['gtfs_direction_id'] == 1 else "FROM DOWNTOWN"
         tdf0_dict = dict(title=title,
                          tickmode = 'array',
                          tickvals = tdf0.iloc[0:tdf0['stop_sequence'].max()].stop_sequence.tolist(),
@@ -300,7 +294,7 @@ def setup_fig_legend(fig, tdf):
     else:
         tdf0_dict = {}
     if not tdf1.empty:
-        title = "TO DOWNTOWN" if tdf1.iloc[0]['gtfs_direction_id'] == 0 else "FROM DOWNTOWN"
+        title = "TO DOWNTOWN" if tdf1.iloc[0]['gtfs_direction_id'] == 1 else "FROM DOWNTOWN"
         tdf1_dict = dict(title=title,
                          tickmode = 'array',
                          tickvals = tdf1.iloc[0:tdf1['stop_sequence'].max()].stop_sequence.tolist(),
