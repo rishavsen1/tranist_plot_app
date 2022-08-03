@@ -85,7 +85,7 @@ with st.sidebar:
     elif dataset_selectbox == 'Nashville, MTA':
         filter_date = st.date_input('Filter dates', 
                                     min_value=dt.date(2020, 1, 1), max_value=dt.date(2022, 4, 6),
-                                    value=dt.date(2021, 10, 18))
+                                    value=dt.date(2021, 11, 1))
         apcdata = get_apc_data_for_date(filter_date)
         block_abbr_list = get_block_abbr_list(apcdata)
         block_option = st.selectbox('Block:', block_abbr_list)
