@@ -47,6 +47,11 @@ with st.sidebar:
         "Routes:",
         ('only active routes', 'all routes'),
         horizontal=True)
+    mode = st.radio(
+        "Mode:",
+        ('any day', 'day ahead'),
+        horizontal=True
+    )
     
     predict_button = st.button('Plot predictions')
 
@@ -88,14 +93,16 @@ if predict_button:
         ## Isolate predictions with bin 2 for 2-3-4
         high_bin_df = input_df[input_df['y_pred'] == 2]
         high_bin_df = high_bin_df.drop(['y_pred'], axis=1)
-        high_bin_index = high_bin_df.index            
+        high_bin_index = high_bin_df.index
+        high_bin_df = high_bin_df[columns]
+        st.dataframe(high_bin_df)
         predictions = model234.predict(high_bin_df)
         predictions = predictions + 2
         input_df.loc[high_bin_index, 'y_pred'] = predictions
         ohe_features = ['route_id_direction', 'is_holiday', 'dayofweek']
         input_df[ohe_features] = ohe_encoder.inverse_transform(input_df.filter(regex='route_id_direction_|is_holiday_|dayofweek_'))
         df = generate_results(input_df)
-        if routes == 'all routes':                
+        if routes == 'all routes':
             all_routes_list = pd.read_csv("data/mta_day_ahead/all_routes.txt")['0'].tolist()
             new_index = pd.Index(all_routes_list, name="route_id_direction")
             df = df.reset_index()

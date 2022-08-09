@@ -8,6 +8,8 @@ from copy import deepcopy
 import datetime as dt
 import streamlit as st
 
+# TODO: Add holiday and speed info
+
 def get_class(val, percentiles):
     for i, (min, max) in enumerate(percentiles):
         if (val >= min) and (val <= max):

@@ -5,6 +5,7 @@ import joblib
 import pandas as pd
 import datetime as dt
 import numpy as np
+import random
 
 def convert_pandas_dow_to_pyspark(pandas_dow):
     return (pandas_dow + 1) % 7 + 1
@@ -33,7 +34,12 @@ def get_past_data(spark, predict_date):
     
 def generate_new_features(tdf, time_window=30, past_trips=20, target='y_reg'):
     tdf['day'] = tdf.transit_date.dt.day
-    tdf['time_window'] = tdf.apply(lambda x: data_utils.get_time_window(x, time_window, row_name='arrival_time'), axis=1)
+    # tdf['time_window'] = tdf.apply(lambda x: data_utils.get_time_window(x, time_window, row_name='arrival_time'), axis=1)
+    tdf['minute'] = tdf['arrival_time'].dt.minute
+    tdf['minuteByWindow'] = tdf['minute'] // time_window
+    tdf['temp'] = tdf['minuteByWindow'] + (tdf['hour'] * 60 / time_window)
+    tdf['time_window'] = np.floor(tdf['temp']).astype('int')
+    tdf = tdf.drop(columns=['minute', 'minuteByWindow', 'temp'])
     sort2 = ['block_abbr', 'transit_date', 'arrival_time', 'route_id_direction']
     tdf = tdf.sort_values(sort2)
     tdf = tdf.dropna()
@@ -116,8 +122,11 @@ def prepare_day_ahead_for_prediction(input_df):
     ohe_encoder = joblib.load('data/mta_day_ahead/TL_OHE_encoders.joblib')
     
     # OHE for route_id_direction
-    input_df[ohe_encoder.get_feature_names_out()] = ohe_encoder.transform(input_df[cat_features]).toarray()
-    input_df = input_df.drop(columns=cat_features)
+    try:
+        input_df[ohe_encoder.get_feature_names_out()] = ohe_encoder.transform(input_df[cat_features]).toarray()
+        input_df = input_df.drop(columns=cat_features)
+    except:
+        print(input_df)
     
     # label encode of categorical variables
     for col in ord_features:
@@ -159,7 +168,7 @@ def load_holiday_data(path='data/mta_day_ahead/US Holiday Dates (2004-2021).csv'
     holidays_df['Date'] = pd.to_datetime(holidays_df['Date'])
     return holidays_df
 
-
+# TODO: Add speed data and past data (for day ahead vs any day prediction)
 def setup_day_ahead_data(DATE_TO_PREDICT, past_df, darksky, holidays_df, TARGET='load'):
     DAY_OF_WEEK = convert_pandas_dow_to_pyspark(pd.Timestamp(DATE_TO_PREDICT).day_of_week)
     a = past_df.groupby(['route_id_direction', 'time_window']).agg({'actual_headways':list, 'scheduled_headway': list, TARGET: list})
@@ -195,7 +204,7 @@ def setup_day_ahead_data(DATE_TO_PREDICT, past_df, darksky, holidays_df, TARGET=
 def setup_input_data(DATE_TO_PREDICT, past_df):
     darksky = load_weather_data()
     holidays_df = load_holiday_data()
-    input_df = setup_day_ahead_data(DATE_TO_PREDICT, past_df, darksky, holidays_df)
+    input_df = setup_day_ahead_data(DATE_TO_PREDICT, past_df, darksky, holidays_df, TARGET='y_reg100')
     return input_df
 
 def generate_results(input_df):
@@ -209,7 +218,6 @@ def generate_results(input_df):
     a = a.apply(pd.to_numeric, errors='coerce')
     a.columns = a.columns.astype('int')
     return a
-
 
 def create_random_data(DATE_TO_PREDICT):
     all_routes_list = pd.read_csv("data/mta_day_ahead/all_routes.txt")
@@ -245,7 +253,7 @@ def create_random_data(DATE_TO_PREDICT):
         a[8] = pd.Timestamp(date).year
         a['month'] = pd.Timestamp(date).month
         a['day'] = pd.Timestamp(date).day
-        a['dayofweek'] = pd.Timestamp(date).day_of_week
+        a['dayofweek'] = convert_pandas_dow_to_pyspark(pd.Timestamp(date).day_of_week)
         a[0] = random_route
         print(a.shape)
         a.columns = column_names

@@ -10,7 +10,8 @@ from copy import deepcopy
 bvals = [0, 1, 2, 3, 4, 5]
 colors = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
 tickvals = [0, 1, 2, 3, 4, 5]
-ticktext = ['low', 'med', 'med-high', 'high', 'very-high']
+ticktext = ['low:0-9', 'med:10-16', 'med-high:16-55', 'high:56-75', 'very-high:76-100']
+# [(0.0, 9.0), (10.0, 16.0), (16.0, 55.0), (56.0, 75.0), (76.0, 100.0)]
 
 line_colors = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99']
 marker_edges = ['#f7f7f7','#cccccc','#969696','#525252', '#f7f7f7','#cccccc','#969696','#525252', '#f7f7f7','#cccccc','#969696']
