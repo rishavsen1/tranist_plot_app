@@ -76,7 +76,110 @@ def get_apc_data_for_date(filter_date):
     # apcdata = apcdata.drop("route_direction_name")
     apcdata = apcdata.withColumn("load", F.when(apcdata.load < 0, 0).otherwise(apcdata.load))
     return apcdata
+
+def plot_boardings(df, directions):
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    df_high = []
+    # Plot lines and markers
+    for i, direction in enumerate(directions):
+        dir_df = df[df['route_direction_name'] == direction]
+        trip_ids = dir_df.groupby(['trip_id']).first().sort_values(by=['departure_time']).reset_index().trip_id.tolist()
+        # r = lambda: random.randint(0,255)
+        # color = '#%02X%02X%02X' % (r(),r(),r())
+        for trip_id in trip_ids:
+            trip_df = dir_df[dir_df['trip_id'] == trip_id]
+            marker_edges = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
+            trip_df['colors'] = trip_df['y_class'].apply(lambda x: marker_edges[x])
+            trip_df['line_color'] = trip_df['vehicle_idx'].apply(lambda x: colors[x])
+
+            trip_df = trip_df.sort_values(by=['departure_time', 'stop_sequence'], ascending=direction != 'TO DOWNTOWN')
+            trip_df['geom_ahead'] = trip_df['geometry'].shift(1)
+            trip_df['distance_from_prev'] = trip_df['geometry'].distance(trip_df['geom_ahead'])
+            trip_df['distance_cusum'] = trip_df['distance_from_prev'].cumsum()
+            trip_df['distance_cusum'] = trip_df['distance_cusum'].fillna(0)
+            trip_df = trip_df.dropna(subset=['departure_time']).reset_index(drop=True)
+            trip_df = trip_df.drop(columns=['geometry'])
+
+            df_high.append(trip_df)
+            color = trip_df.iloc[0]['line_color']
+
+            block_name = str(trip_df['block_abbr'].iloc[0])
+            fig.add_trace(go.Scatter(x=trip_df['departure_time'],
+                                        y=trip_df['distance_cusum'],
+                                        mode='lines+markers',
+                                        showlegend=True,
+                                        legendgroup=block_name,
+                                        legendgrouptitle_text=f"{block_name} trips",
+                                        name=trip_id,
+                                        hoverinfo=None,
+                                        line=dict(color=color, width=3),
+                                        hoverlabel=dict(bgcolor=color),
+                                        marker=dict(line=dict(color='black', width=1.5), 
+                                                    size=10, 
+                                                    color=trip_df['colors']),
+                                        customdata=np.stack((trip_df['block_abbr'], 
+                                                            trip_df['vehicle_id'], 
+                                                            trip_df['stop_name'], 
+                                                            trip_df['ons'], 
+                                                            trip_df['route_direction_name']), axis=-1),
+                                        hovertemplate = ('<b>Block</b>: %{customdata[0]}'+\
+                                                        '<br><b>Vehicle ID</b>: %{customdata[1]}'+\
+                                                        '<br><b>Stop Name</b>: %{customdata[2]}'+\
+                                                        '<br><b>Data</b>: %{customdata[3]}'+\
+                                                        '<br><b>Direction</b>: %{customdata[4]}'+\
+                                                        '<br><b>Departure Time</b>: %{x|%H:%M:%S}<br><extra></extra>')),
+                            secondary_y=direction == 'TO DOWNTOWN')
+        if trip_ids:
+            fig.update_yaxes(
+                    title_text=f"<b>{direction}</b>",
+                    tickmode = 'array',
+                    tickvals = trip_df['distance_cusum'],
+                    ticktext = trip_df['stop_id_original'],
+                    secondary_y=direction == 'TO DOWNTOWN'
+            )
     
+    labels = ["0-5 pax", "6-11 pax", "12-16 pax", "17-29 pax", "30-100 pax"]
+
+    df_high = pd.concat(df_high)
+    
+    # Plot y_class legend
+    for y_class, y_class_df in df_high.groupby("y_class"):
+        y_class_df = y_class_df[0:1]
+        direction = y_class_df['route_direction_name'].unique().tolist()[0]
+        fig.add_trace(go.Scatter(x=y_class_df['departure_time'],
+                                    y=y_class_df['distance_cusum'],
+                                    mode='markers',
+                                    showlegend=True,
+                                    legendgroup=data_options,
+                                    legendgrouptitle_text=data_options,
+                                    name=labels[y_class],
+                                    hoverlabel=dict(bgcolor=color),
+                                    marker=dict(line=dict(color='black', width=1.5),
+                                                size=10, 
+                                                color=y_class_df['colors']),
+                                    customdata=np.stack((y_class_df['block_abbr'], 
+                                                        y_class_df['vehicle_id'], 
+                                                        y_class_df['stop_name'], 
+                                                        y_class_df['ons'], 
+                                                        y_class_df['route_direction_name']), axis=-1),
+                                    hovertemplate = ('<b>Block</b>: %{customdata[0]}'+\
+                                                    '<br><b>Vehicle ID</b>: %{customdata[1]}'+\
+                                                    '<br><b>Stop Name</b>: %{customdata[2]}'+\
+                                                    '<br><b>Data</b>: %{customdata[3]}'+\
+                                                    '<br><b>Direction</b>: %{customdata[4]}'+\
+                                                    '<br><b>Departure Time</b>: %{x|%H:%M:%S}<br><extra></extra>')),
+                        secondary_y=direction == 'TO DOWNTOWN')
+    
+    if enable1 and enable2:
+        fig.update_layout(title=f'{data_options} for Block: {block_options1}, Route: {route_option} {direction_option_label1} and {block_options2} {direction_option_label2}')
+    elif enable1 and not enable2:
+        fig.update_layout(title=f'{data_options} for Block: {block_options1}, Route: {route_option} {direction_option_label1}')
+    elif not enable1 and enable2:
+        fig.update_layout(title=f'{data_options} for Block: {block_options2}, Route: {route_option} {direction_option_label2}')
+    
+    fig.update_layout(legend=dict(groupclick="toggleitem"), xaxis_title="<b>Departure Times</b>",)
+    return fig
+
 st.title("String Plots")
 st.sidebar.markdown("# Parameters")
 
@@ -159,8 +262,6 @@ if plot_button:
             block_options = block_options2
             
         df = assign_data_to_bins(df, data_options)
-        
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
         df['geometry'] = df.apply(lambda x: Point(x['map_latitude'], x['map_longitude']), axis=1)
         df = gpd.GeoDataFrame(df, geometry='geometry')
         
@@ -169,104 +270,18 @@ if plot_button:
         df['vehicle_idx'] = df['vehicle_id'].apply(lambda x: vehicle_list.index(x))
         df['block_idx'] = df['block_abbr'].apply(lambda x: block_options.index(x))
         
-        df_high = []
         directions = list(set([direction_option_label1.upper(), direction_option_label2.upper()]))
         colors = ['#67001f','#b2182b','#d6604d','#f4a582','#fddbc7','#f7f7f7','#d1e5f0','#92c5de','#4393c3','#2166ac','#053061']
         
-        for i, direction in enumerate(directions):
-            dir_df = df[df['route_direction_name'] == direction]
-            trip_ids = dir_df.groupby(['trip_id']).first().sort_values(by=['departure_time']).reset_index().trip_id.tolist()
-            # r = lambda: random.randint(0,255)
-            # color = '#%02X%02X%02X' % (r(),r(),r())
-            for trip_id in trip_ids:
-                trip_df = dir_df[dir_df['trip_id'] == trip_id]
-                marker_edges = ['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026']
-                trip_df['colors'] = trip_df['y_class'].apply(lambda x: marker_edges[x])
-                trip_df['line_color'] = trip_df['vehicle_idx'].apply(lambda x: colors[x])
-
-                trip_df = trip_df.sort_values(by=['departure_time', 'stop_sequence'], ascending=direction != 'TO DOWNTOWN')
-                trip_df['geom_ahead'] = trip_df['geometry'].shift(1)
-                trip_df['distance_from_prev'] = trip_df['geometry'].distance(trip_df['geom_ahead'])
-                trip_df['distance_cusum'] = trip_df['distance_from_prev'].cumsum()
-                trip_df['distance_cusum'] = trip_df['distance_cusum'].fillna(0)
-                trip_df = trip_df.dropna(subset=['departure_time']).reset_index(drop=True)
-                trip_df = trip_df.drop(columns=['geometry'])
-
-                df_high.append(trip_df)
-                color = trip_df.iloc[0]['line_color']
-
-                block_name = str(trip_df['block_abbr'].iloc[0])
-                fig.add_trace(go.Scatter(x=trip_df['departure_time'],
-                                         y=trip_df['distance_cusum'],
-                                         mode='lines+markers',
-                                         showlegend=True,
-                                         legendgroup=block_name,
-                                         legendgrouptitle_text=f"{block_name} trips",
-                                         name=trip_id,
-                                         hoverinfo=None,
-                                         line=dict(color=color, width=3),
-                                         hoverlabel=dict(bgcolor=color),
-                                         marker=dict(line=dict(color='black', width=1.5), 
-                                                     size=10, 
-                                                     color=trip_df['colors']),
-                                         customdata=np.stack((trip_df['block_abbr'], 
-                                                              trip_df['vehicle_id'], 
-                                                              trip_df['stop_name'], 
-                                                              trip_df['ons'], 
-                                                              trip_df['route_direction_name']), axis=-1),
-                                         hovertemplate = ('<b>Block</b>: %{customdata[0]}'+\
-                                                          '<br><b>Vehicle ID</b>: %{customdata[1]}'+\
-                                                          '<br><b>Stop Name</b>: %{customdata[2]}'+\
-                                                          '<br><b>Data</b>: %{customdata[3]}'+\
-                                                          '<br><b>Direction</b>: %{customdata[4]}'+\
-                                                          '<br><b>Departure Time</b>: %{x|%H:%M:%S}<br><extra></extra>')),
-                              secondary_y=direction == 'TO DOWNTOWN')
-            if trip_ids:
-                fig.update_yaxes(
-                        title_text=f"<b>{direction}</b>",
-                        tickmode = 'array',
-                        tickvals = trip_df['distance_cusum'],
-                        ticktext = trip_df['stop_id_original'],
-                        secondary_y=direction == 'TO DOWNTOWN'
-                )
-        
-        labels = ["0-5 pax", "6-11 pax", "12-16 pax", "17-29 pax", "30-100 pax"]
-
-        df_high = pd.concat(df_high)
-                
-        for y_class, y_class_df in df_high.groupby("y_class"):
-            y_class_df = y_class_df[0:1]
-            direction = y_class_df['route_direction_name'].unique().tolist()[0]
-            fig.add_trace(go.Scatter(x=y_class_df['departure_time'],
-                                     y=y_class_df['distance_cusum'],
-                                     mode='markers',
-                                     showlegend=True,
-                                     legendgroup=data_options,
-                                     legendgrouptitle_text=data_options,
-                                     name=labels[y_class],
-                                     hoverlabel=dict(bgcolor=color),
-                                     marker=dict(line=dict(color='black', width=1.5),
-                                                 size=10, 
-                                                 color=y_class_df['colors']),
-                                     customdata=np.stack((y_class_df['block_abbr'], 
-                                                          y_class_df['vehicle_id'], 
-                                                          y_class_df['stop_name'], 
-                                                          y_class_df['ons'], 
-                                                          y_class_df['route_direction_name']), axis=-1),
-                                     hovertemplate = ('<b>Block</b>: %{customdata[0]}'+\
-                                                     '<br><b>Vehicle ID</b>: %{customdata[1]}'+\
-                                                     '<br><b>Stop Name</b>: %{customdata[2]}'+\
-                                                     '<br><b>Data</b>: %{customdata[3]}'+\
-                                                     '<br><b>Direction</b>: %{customdata[4]}'+\
-                                                     '<br><b>Departure Time</b>: %{x|%H:%M:%S}<br><extra></extra>')),
-                            secondary_y=direction == 'TO DOWNTOWN')
-        
-        if enable1 and enable2:
-            fig.update_layout(title=f'{data_options} for Block: {block_options1}, Route: {route_option} {direction_option_label1} and {block_options2} {direction_option_label2}')
-        elif enable1 and not enable2:
-            fig.update_layout(title=f'{data_options} for Block: {block_options1}, Route: {route_option} {direction_option_label1}')
-        elif not enable1 and enable2:
-            fig.update_layout(title=f'{data_options} for Block: {block_options2}, Route: {route_option} {direction_option_label2}')
-        
-        fig.update_layout(legend=dict(groupclick="toggleitem"), xaxis_title="<b>Departure Times</b>",)
+        if data_options == 'Boardings':
+            fig = plot_boardings(df, directions)
+        # elif data_options == 'Occupancy':
+        #     st.write(predict_time)
+        #     fig = make_subplots(specs=[[{"secondary_y": True}]])
+            
+        #     datetime_now = dt.datetime.combine(filter_date, predict_time)
+        #     tdf = df[df['departure_time'] < datetime_now]
+        #     tdf = tdf.drop(columns=['geometry'])
+        #     st.dataframe(tdf)
+            
         st.plotly_chart(fig)
