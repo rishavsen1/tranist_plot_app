@@ -89,10 +89,10 @@ def setup_simple_lstm_generator(num_features, num_classes, learning_rate=1e-4):
     model.build(input_shape)
     return model
 
-def get_model(num_features):
-    simple_lstm = setup_simple_lstm_generator(num_features, 3)
+def get_model(num_features, path='data/mta_stop_level/', num_classes=3):
+    simple_lstm = setup_simple_lstm_generator(num_features, num_classes)
     # Load model
-    latest = tf.train.latest_checkpoint('data/mta_stop_level')
+    latest = tf.train.latest_checkpoint(path)
     simple_lstm.load_weights(latest)
     return simple_lstm
 
